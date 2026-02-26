@@ -14,6 +14,7 @@ export interface StudySession {
 interface StudyState {
   sessions: StudySession[];
   addSession: (session: Omit<StudySession, 'id'>) => void;
+  updateSession: (id: string, session: Partial<Omit<StudySession, 'id'>>) => void;
   deleteSessions: (ids: string[]) => void;
 }
 
@@ -59,6 +60,13 @@ export const useStudyStore = create<StudyState>()(
           : Date.now().toString(36) + Math.random().toString(36).substring(2);
         const newSession = { ...session, id };
         set((state) => ({ sessions: [newSession, ...state.sessions] }));
+      },
+      updateSession: (id, sessionUpdate) => {
+        set((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === id ? { ...s, ...sessionUpdate } : s
+          ),
+        }));
       },
       deleteSessions: (ids) => {
         set((state) => ({
