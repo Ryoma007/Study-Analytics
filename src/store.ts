@@ -20,7 +20,10 @@ export function useStudyStore() {
   }, [sessions]);
 
   const addSession = (session: Omit<StudySession, 'id'>) => {
-    const newSession = { ...session, id: crypto.randomUUID() };
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID 
+      ? crypto.randomUUID() 
+      : Date.now().toString(36) + Math.random().toString(36).substring(2);
+    const newSession = { ...session, id };
     setSessions((prev) => [newSession, ...prev]);
   };
 
