@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  study-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: study-tracker
+    ports:
+      - "47291:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
