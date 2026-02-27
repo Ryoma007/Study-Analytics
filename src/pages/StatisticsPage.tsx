@@ -1,6 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { useStudyStore } from '../store';
-import { format, subDays, isSameDay, parseISO, startOfDay, eachDayOfInterval } from 'date-fns';
+import { 
+  format, 
+  subDays, 
+  isSameDay, 
+  startOfDay, 
+  eachDayOfInterval, 
+  subMonths, 
+  startOfMonth, 
+  endOfMonth, 
+  isSameMonth, 
+  eachMonthOfInterval 
+} from 'date-fns';
 import {
   BarChart,
   Bar,
@@ -14,26 +25,47 @@ import { Calendar, Clock, Target } from 'lucide-react';
 
 export function StatisticsPage() {
   const { sessions } = useStudyStore();
-  const [daysRange, setDaysRange] = useState(7);
+  const [rangeType, setRangeType] = useState<'7' | '14' | '30' | 'year'>('7');
 
   const stats = useMemo(() => {
     const today = startOfDay(new Date());
-    const startDate = subDays(today, daysRange - 1);
-    
-    const dateRange = eachDayOfInterval({ start: startDate, end: today });
-    
-    // First pass to calculate raw seconds
-    const rawChartData = dateRange.map(date => {
-      const daySessions = sessions.filter(s => isSameDay(new Date(s.startTime), date));
-      const totalSeconds = daySessions.reduce((acc, curr) => acc + curr.duration, 0);
-      return {
-        date: format(date, 'M月d日'),
-        totalSeconds,
-      };
-    });
+    let chartDataRaw: { label: string; totalSeconds: number; hasStudied: boolean }[] = [];
+    let startDate: Date;
+    let totalDaysInRange: number;
+
+    if (rangeType === 'year') {
+      startDate = startOfMonth(subMonths(today, 11));
+      totalDaysInRange = 365; // Approximate for averaging
+      const monthRange = eachMonthOfInterval({ start: startDate, end: today });
+      
+      chartDataRaw = monthRange.map(month => {
+        const monthSessions = sessions.filter(s => isSameMonth(new Date(s.startTime), month));
+        const totalSeconds = monthSessions.reduce((acc, curr) => acc + curr.duration, 0);
+        return {
+          label: format(month, 'yy年M月'),
+          totalSeconds,
+          hasStudied: totalSeconds > 0
+        };
+      });
+    } else {
+      const days = parseInt(rangeType);
+      startDate = subDays(today, days - 1);
+      totalDaysInRange = days;
+      const dateRange = eachDayOfInterval({ start: startDate, end: today });
+      
+      chartDataRaw = dateRange.map(date => {
+        const daySessions = sessions.filter(s => isSameDay(new Date(s.startTime), date));
+        const totalSeconds = daySessions.reduce((acc, curr) => acc + curr.duration, 0);
+        return {
+          label: format(date, 'M月d日'),
+          totalSeconds,
+          hasStudied: totalSeconds > 0
+        };
+      });
+    }
 
     // Determine the appropriate unit for the chart based on the maximum value
-    const maxSeconds = Math.max(...rawChartData.map(d => d.totalSeconds));
+    const maxSeconds = Math.max(...chartDataRaw.map(d => d.totalSeconds));
     let chartUnit = '秒';
     let chartDataKey = 'durationSeconds';
     
@@ -45,8 +77,7 @@ export function StatisticsPage() {
       chartDataKey = 'durationMinutes';
     }
 
-    // Second pass to format data for the chart
-    const chartData = rawChartData.map(d => {
+    const chartData = chartDataRaw.map(d => {
       let value = d.totalSeconds;
       if (chartUnit === '小时') {
         value = Number((d.totalSeconds / 3600).toFixed(2));
@@ -54,9 +85,9 @@ export function StatisticsPage() {
         value = Number((d.totalSeconds / 60).toFixed(1));
       }
       return {
-        date: d.date,
+        label: d.label,
         [chartDataKey]: value,
-        hasStudied: d.totalSeconds > 0
+        hasStudied: d.hasStudied
       };
     });
 
@@ -64,7 +95,13 @@ export function StatisticsPage() {
       .filter(s => new Date(s.startTime) >= startDate)
       .reduce((acc, curr) => acc + curr.duration, 0);
 
-    const daysStudied = chartData.filter(d => d.hasStudied).length;
+    const daysStudied = rangeType === 'year' 
+      ? sessions.filter(s => new Date(s.startTime) >= startDate).reduce((acc, curr) => {
+          const day = format(new Date(curr.startTime), 'yyyy-MM-dd');
+          if (!acc.includes(day)) acc.push(day);
+          return acc;
+        }, [] as string[]).length
+      : chartData.filter(d => d.hasStudied).length;
 
     const formatTimeValue = (seconds: number) => {
       if (seconds === 0) return { value: '0', unit: '分钟' };
@@ -73,7 +110,7 @@ export function StatisticsPage() {
       return { value: (seconds / 3600).toFixed(2), unit: '小时' };
     };
 
-    const avgSecondsPerDay = totalSecondsInRange / daysRange;
+    const avgSecondsPerDay = totalSecondsInRange / totalDaysInRange;
 
     return {
       chartData,
@@ -82,25 +119,26 @@ export function StatisticsPage() {
       totalTime: formatTimeValue(totalSecondsInRange),
       avgTime: formatTimeValue(avgSecondsPerDay),
       daysStudied,
+      totalDaysInRange
     };
-  }, [sessions, daysRange]);
+  }, [sessions, rangeType]);
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-slate-800 tracking-tight">学习统计</h2>
         <div className="flex bg-white rounded-lg p-1 shadow-sm border border-slate-200">
-          {[7, 14, 30].map(days => (
+          {(['7', '14', '30', 'year'] as const).map(range => (
             <button
-              key={days}
-              onClick={() => setDaysRange(days)}
+              key={range}
+              onClick={() => setRangeType(range)}
               className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                daysRange === days
+                rangeType === range
                   ? 'bg-indigo-50 text-indigo-700'
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              {days} 天
+              {range === 'year' ? '近一年' : `${range} 天`}
             </button>
           ))}
         </div>
@@ -133,7 +171,7 @@ export function StatisticsPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">学习天数</p>
-            <p className="text-2xl font-bold text-slate-800">{stats.daysStudied} <span className="text-base font-normal text-slate-500">/ {daysRange}</span></p>
+            <p className="text-2xl font-bold text-slate-800">{stats.daysStudied} <span className="text-base font-normal text-slate-500">/ {stats.totalDaysInRange}</span></p>
           </div>
         </div>
       </div>
@@ -145,7 +183,7 @@ export function StatisticsPage() {
             <BarChart data={stats.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis 
-                dataKey="date" 
+                dataKey="label" 
                 axisLine={false} 
                 tickLine={false} 
                 tick={{ fill: '#64748b', fontSize: 12 }} 
