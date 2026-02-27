@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useStudyStore, StudySession } from '../store';
 import { format } from 'date-fns';
-import { Trash2, CheckSquare, Square, Plus, Edit2, X } from 'lucide-react';
+import { Trash2, CheckSquare, Square, Plus, Edit2, X, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function HistoryPage() {
   const { sessions, deleteSessions, addSession, updateSession } = useStudyStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<StudySession | null>(null);
   
   const [formData, setFormData] = useState({
@@ -32,10 +34,14 @@ export function HistoryPage() {
 
   const handleDelete = () => {
     if (selectedIds.length === 0) return;
-    if (window.confirm(`确定要删除这 ${selectedIds.length} 条记录吗？`)) {
-      deleteSessions(selectedIds);
-      setSelectedIds([]);
-    }
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    deleteSessions(selectedIds);
+    setSelectedIds([]);
+    setIsDeleteConfirmOpen(false);
+    toast.success('记录已成功删除');
   };
 
   const formatDuration = (seconds: number) => {
@@ -88,6 +94,7 @@ export function HistoryPage() {
         duration,
         content: formData.content
       });
+      toast.success('记录已更新');
     } else {
       addSession({
         date: formData.date,
@@ -96,6 +103,7 @@ export function HistoryPage() {
         duration,
         content: formData.content
       });
+      toast.success('记录已添加');
     }
     setIsModalOpen(false);
   };
@@ -269,6 +277,38 @@ export function HistoryPage() {
                 className="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
               >
                 保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-6 text-center space-y-4">
+              <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-slate-800">确认删除</h3>
+                <p className="text-slate-500 text-sm">
+                  确定要删除这 {selectedIds.length} 条记录吗？此操作无法撤销。
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-4 border-t border-slate-100 bg-slate-50">
+              <button
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 bg-rose-600 text-white text-sm font-medium rounded-lg hover:bg-rose-700 transition-colors shadow-sm"
+              >
+                确认删除
               </button>
             </div>
           </div>

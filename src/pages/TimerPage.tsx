@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Square, Save } from 'lucide-react';
 import { useStudyStore } from '../store';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 export function TimerPage() {
   const { addSession } = useStudyStore();
@@ -54,7 +55,7 @@ export function TimerPage() {
       setElapsed(0);
       setContent('');
       setSessionStartTime(null);
-      alert('学习记录保存成功！');
+      toast.success('学习记录保存成功！');
     }
   };
 
