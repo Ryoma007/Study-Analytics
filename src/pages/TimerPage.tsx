@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Pause, Square, Save } from 'lucide-react';
 import { useStudyStore } from '../store';
 import { format } from 'date-fns';
@@ -8,53 +8,81 @@ export function TimerPage() {
   const { addSession } = useStudyStore();
   
   const [isRunning, setIsRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0); // in seconds
+  const [accumulatedTime, setAccumulatedTime] = useState(0); // in seconds
+  const [lastStartTime, setLastStartTime] = useState<number | null>(null);
+  const [displayTime, setDisplayTime] = useState(0); // in seconds
   const [content, setContent] = useState('');
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
-  
-  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (isRunning) {
-      intervalRef.current = window.setInterval(() => {
-        setElapsed((prev) => prev + 1);
+    let interval: number;
+    if (isRunning && lastStartTime) {
+      // Update the display time every second based on actual system time
+      interval = window.setInterval(() => {
+        const currentSegment = Math.floor((Date.now() - lastStartTime) / 1000);
+        setDisplayTime(accumulatedTime + currentSegment);
       }, 1000);
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+    } else {
+      setDisplayTime(accumulatedTime);
     }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+    
+    // Immediately update when the tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isRunning && lastStartTime) {
+        const currentSegment = Math.floor((Date.now() - lastStartTime) / 1000);
+        setDisplayTime(accumulatedTime + currentSegment);
+      }
     };
-  }, [isRunning]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isRunning, lastStartTime, accumulatedTime]);
 
   const handleStart = () => {
+    const now = Date.now();
     if (!sessionStartTime) {
-      setSessionStartTime(Date.now());
+      setSessionStartTime(now);
     }
+    setLastStartTime(now);
     setIsRunning(true);
   };
 
   const handlePause = () => {
+    if (lastStartTime) {
+      const currentSegment = Math.floor((Date.now() - lastStartTime) / 1000);
+      setAccumulatedTime(prev => prev + currentSegment);
+    }
+    setLastStartTime(null);
     setIsRunning(false);
   };
 
   const handleStop = () => {
     setIsRunning(false);
     
-    if (elapsed > 0) {
+    let finalDuration = accumulatedTime;
+    if (lastStartTime) {
+      finalDuration += Math.floor((Date.now() - lastStartTime) / 1000);
+    }
+    
+    if (finalDuration > 0) {
       const now = Date.now();
       addSession({
         date: format(now, 'yyyy-MM-dd'),
-        startTime: sessionStartTime || now - elapsed * 1000,
+        startTime: sessionStartTime || now - finalDuration * 1000,
         endTime: now,
-        duration: elapsed,
+        duration: finalDuration,
         content: content.trim() || '日常学习',
       });
       
       // Reset
-      setElapsed(0);
+      setAccumulatedTime(0);
+      setDisplayTime(0);
       setContent('');
       setSessionStartTime(null);
+      setLastStartTime(null);
       toast.success('学习记录保存成功！');
     }
   };
@@ -71,7 +99,7 @@ export function TimerPage() {
       <div className="text-center space-y-4">
         <h2 className="text-sm font-semibold tracking-widest text-slate-400 uppercase">当前学习</h2>
         <div className="text-8xl font-mono font-light text-slate-800 tracking-tight">
-          {formatTime(elapsed)}
+          {formatTime(displayTime)}
         </div>
       </div>
 
@@ -94,9 +122,9 @@ export function TimerPage() {
 
         <button
           onClick={handleStop}
-          disabled={elapsed === 0}
+          disabled={displayTime === 0}
           className={`w-20 h-20 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 ${
-            elapsed === 0
+            displayTime === 0
               ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
               : 'bg-rose-500 text-white shadow-rose-200 hover:bg-rose-600 hover:scale-105'
           }`}
