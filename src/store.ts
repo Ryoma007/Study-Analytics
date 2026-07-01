@@ -31,7 +31,7 @@ interface LegacySession {
 }
 
 /** Store 状态接口 */
-interface ActivityState {
+export interface ActivityState {
   sessions: ActivitySession[];
   /** 当前全局活动类型 */
   currentType: ActivityType;
@@ -70,12 +70,64 @@ const migrateSession = (session: LegacySession | ActivitySession): ActivitySessi
   if (typeof s.type === 'object' && s.type !== null && 'enumKey' in s.type) {
     const typeName = (s.type as { enumKey: string }).enumKey;
     try {
-      s.type = ActivityType.enumValueOf(typeName);
+      // enumValueOf 对无效 key 返回 undefined（不抛异常），需 || 兜底
+      s.type = ActivityType.enumValueOf(typeName) || ActivityType.STUDY;
     } catch {
       s.type = ActivityType.STUDY;
     }
   }
   return s;
+};
+
+/**
+ * 自定义 persist merge 函数
+ * 将水化后的普通对象恢复为 Enumify 实例
+ * createJSONStorage 的 JSON.parse 会将 ActivityType 实例变为 {enumKey: "X"}
+ * 此函数在 persist 合并阶段将其恢复为真正的 ActivityType 实例
+ */
+export const activityMerge = (
+  persisted: Partial<ActivityState> | null | undefined,
+  current: ActivityState
+): ActivityState => {
+  // persisted 为 null/undefined 时使用初始值兜底
+  if (!persisted || typeof persisted !== 'object') {
+    return current;
+  }
+
+  // 标准合并：persisted 覆盖 current
+  const merged = { ...current, ...persisted } as ActivityState;
+
+  // --- 恢复 currentType ---
+  const rawType = (persisted as Record<string, unknown>).currentType;
+  if (rawType && typeof rawType === 'object' && !(rawType instanceof ActivityType)) {
+    const enumKey = (rawType as Record<string, unknown>).enumKey;
+    if (typeof enumKey === 'string') {
+      try {
+        // enumValueOf 对无效 key 返回 undefined（不抛异常），需 || 兜底
+        merged.currentType = ActivityType.enumValueOf(enumKey) || ActivityType.STUDY;
+      } catch {
+        merged.currentType = ActivityType.STUDY;
+      }
+    } else {
+      merged.currentType = ActivityType.STUDY;
+    }
+  } else if (!rawType) {
+    // persisted 中无 currentType（首次访问或新字段），使用 current 的值
+    merged.currentType = current.currentType;
+  }
+  // else: rawType 已经是 ActivityType 实例，保持不变
+
+  // --- 恢复 sessions[].type ---
+  if (Array.isArray(merged.sessions)) {
+    merged.sessions = merged.sessions.map(migrateSession);
+  }
+
+  // --- isTimerRunning 默认值 ---
+  if (merged.isTimerRunning === undefined || merged.isTimerRunning === null) {
+    merged.isTimerRunning = false;
+  }
+
+  return merged;
 };
 
 /** 自定义 IndexedDB 存储引擎 */
@@ -109,30 +161,6 @@ const idbStorage: StateStorage = {
         }
       }
       return null;
-    }
-    // 对读出的数据进行迁移处理
-    try {
-      const parsed = JSON.parse(data);
-      if (parsed.state && Array.isArray(parsed.state.sessions)) {
-        parsed.state.sessions = parsed.state.sessions.map(migrateSession);
-        // 确保 currentType 和 isTimerRunning 有默认值
-        if (!parsed.state.currentType) {
-          parsed.state.currentType = ActivityType.STUDY;
-        } else if (typeof parsed.state.currentType === 'object' && parsed.state.currentType.enumKey) {
-          // 反序列化：将 JSON 对象恢复为 enumify 实例
-          try {
-            parsed.state.currentType = ActivityType.enumValueOf(parsed.state.currentType.enumKey);
-          } catch {
-            parsed.state.currentType = ActivityType.STUDY;
-          }
-        }
-        if (parsed.state.isTimerRunning === undefined) {
-          parsed.state.isTimerRunning = false;
-        }
-        data = JSON.stringify(parsed);
-      }
-    } catch {
-      // 忽略解析错误
     }
     return data;
   },
@@ -197,6 +225,7 @@ export const useActivityStore = create<ActivityState>()(
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => idbStorage),
+      merge: activityMerge,
     }
   )
 );
