@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-学习记录（Study Analytics）—— 纯前端学习时长追踪 SPA。支持计时器、历史记录管理、数据统计图表（日/周/月/年维度）。
+学习与阅读时间记录（Study Analytics）—— 纯前端活动时长追踪 SPA。支持学习和阅读两种类型的计时器、历史记录管理、按类型过滤的数据统计图表（日/周/月/年维度）。
 
 ## 技术栈
 
@@ -20,6 +20,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 图标 | lucide-react |
 | 动画 | motion (Framer Motion) |
 | Toast | sonner |
+| 枚举 | enumify 2 |
+| 测试 | vitest 4 + @testing-library/react + jsdom |
 | AI | @google/genai (Gemini API) |
 
 ## 常用命令
@@ -27,6 +29,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # 开发服务器（端口 3001，绑定所有网卡）
 pnpm dev
+
+# 运行测试
+pnpm vitest run
+
+# 运行测试（监听模式）
+pnpm vitest
 
 # 构建
 pnpm build
@@ -48,13 +56,20 @@ pnpm clean
 ├── src/
 │   ├── main.tsx              # 入口，挂载 React 根节点
 │   ├── App.tsx               # 根组件，管理 tab 切换状态（timer/history/statistics）
-│   ├── store.ts              # Zustand store，含 StudySession 数据模型和 CRUD
+│   ├── store.ts              # Zustand store，含 ActivitySession 数据模型和 CRUD
+│   ├── enums/
+│   │   ├── ActivityType.ts   # 活动类型枚举（STUDY/READING）
+│   │   └── index.ts          # 枚举统一导出
+│   ├── test/
+│   │   ├── setup.ts          # vitest 初始化（@testing-library/jest-dom）
+│   │   ├── __mocks__/idb-keyval.ts  # idb-keyval mock（jsdom 无 IndexedDB）
+│   │   └── *.test.{ts,tsx}   # 测试文件
 │   ├── components/
-│   │   └── Layout.tsx        # 侧边栏布局（3 个 tab 导航）
+│   │   └── Layout.tsx        # 侧边栏布局（3 个 tab + 学习/阅读分段按钮）
 │   ├── pages/
-│   │   ├── TimerPage.tsx     # 学习计时器（开始/暂停/停止）
-│   │   ├── HistoryPage.tsx   # 历史记录列表（CRUD、批量删除）
-│   │   └── StatisticsPage.tsx # 统计图表（7/14/30天/年度柱状图）
+│   │   ├── TimerPage.tsx     # 计时器（开始/暂停/停止，支持学习/阅读文案）
+│   │   ├── HistoryPage.tsx   # 历史记录列表（按类型过滤、CRUD、批量删除）
+│   │   └── StatisticsPage.tsx # 统计图表（按类型过滤、7/14/30天/年度）
 │   └── index.css             # Tailwind 入口（@import "tailwindcss"）
 ├── server.ts / server.js     # Express 后端（如有）
 ├── docs/
@@ -72,24 +87,38 @@ pnpm clean
 
 ### 状态持久化：Zustand + IndexedDB
 
-`store.ts` 中 `useStudyStore` 使用 Zustand 的 `persist` 中间件，自定义 `idbStorage` engine 基于 `idb-keyval`。同时包含从 localStorage 旧格式迁移的逻辑 (`getItem` 中的 `legacyData` 检查)。
+`store.ts` 中 `useActivityStore` 使用 Zustand 的 `persist` 中间件，自定义 `idbStorage` engine 基于 `idb-keyval`。同时包含从 localStorage 和旧 key `study_sessions_storage` 迁移的逻辑。`currentType` 切换受 `isTimerRunning` 守卫保护（计时器运行中禁止切换）。
 
 ### 计时器精度：基于系统时钟
 
 `TimerPage.tsx` 不使用 `setInterval` 累加计数，而是记录 `lastStartTime`（`Date.now()`），展示时间为 `accumulatedTime + 当前分段`。同时监听 `visibilitychange` 事件，标签页恢复可见时立即校准显示时间。
 
-### 数据模型：StudySession
+### 数据模型：ActivitySession（原名 StudySession，已废弃）
 
 ```typescript
-interface StudySession {
-  id: string;        // crypto.randomUUID() 或 fallback
-  date: string;      // YYYY-MM-DD
-  startTime: number; // epoch ms
-  endTime: number;   // epoch ms
-  duration: number;  // 秒
-  content: string;   // 学习内容描述
+interface ActivitySession {
+  id: string;          // crypto.randomUUID() 或 fallback
+  type: ActivityType;  // 活动类型：STUDY | READING
+  date: string;        // YYYY-MM-DD
+  startTime: number;   // epoch ms
+  endTime: number;     // epoch ms
+  duration: number;    // 秒
+  content: string;     // 活动内容描述
 }
 ```
+
+### enumify v2 注意事项
+
+- `.name` 返回 `undefined`，使用 `.enumKey` 获取枚举名（如 `"STUDY"`）
+- `.toString()` 返回 `"ClassName.VALUE"`（如 `"ActivityType.STUDY"`）
+- 序列化后恢复：`ActivityType.enumValueOf(obj.enumKey)`
+- 比较枚举值：使用 `===` 直接比较实例，不要用字符串比较
+
+### 测试约定
+
+- jsdom 不支持 IndexedDB，测试 store 时必须 `vi.mock('idb-keyval')`，mock 实现在 `src/test/__mocks__/idb-keyval.ts`
+- recharts 的 `ResponsiveContainer` 在 jsdom 中无法正常渲染，需 mock 为直接透传 children
+- Tailwind 动态 class：避免用 `{ [key]: value }` lookup 表拼接 class 字符串，改用条件分支返回完整 class 字符串，确保 Tailwind v4 能扫描到
 
 ### 图表单位自适应
 
