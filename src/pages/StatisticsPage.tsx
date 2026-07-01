@@ -1,16 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { useStudyStore } from '../store';
-import { 
-  format, 
-  subDays, 
-  isSameDay, 
-  startOfDay, 
-  eachDayOfInterval, 
-  subMonths, 
-  startOfMonth, 
-  endOfMonth, 
-  isSameMonth, 
-  eachMonthOfInterval 
+import { useActivityStore } from '../store';
+import { ActivityType } from '../enums/ActivityType';
+import {
+  format,
+  subDays,
+  isSameDay,
+  startOfDay,
+  eachDayOfInterval,
+  subMonths,
+  startOfMonth,
+  isSameMonth,
+  eachMonthOfInterval,
 } from 'date-fns';
 import {
   BarChart,
@@ -24,8 +24,15 @@ import {
 import { Calendar, Clock, Target } from 'lucide-react';
 
 export function StatisticsPage() {
-  const { sessions } = useStudyStore();
+  const sessions = useActivityStore((s) => s.sessions);
+  const currentType = useActivityStore((s) => s.currentType);
   const [rangeType, setRangeType] = useState<'7' | '14' | '30' | 'year'>('7');
+
+  // 根据当前类型过滤
+  const filteredSessions = useMemo(
+    () => sessions.filter((s) => s.type === currentType),
+    [sessions, currentType]
+  );
 
   const stats = useMemo(() => {
     const today = startOfDay(new Date());
@@ -35,16 +42,18 @@ export function StatisticsPage() {
 
     if (rangeType === 'year') {
       startDate = startOfMonth(subMonths(today, 11));
-      totalDaysInRange = 365; // Approximate for averaging
+      totalDaysInRange = 365;
       const monthRange = eachMonthOfInterval({ start: startDate, end: today });
-      
-      chartDataRaw = monthRange.map(month => {
-        const monthSessions = sessions.filter(s => isSameMonth(new Date(s.startTime), month));
+
+      chartDataRaw = monthRange.map((month) => {
+        const monthSessions = filteredSessions.filter((s) =>
+          isSameMonth(new Date(s.startTime), month)
+        );
         const totalSeconds = monthSessions.reduce((acc, curr) => acc + curr.duration, 0);
         return {
           label: format(month, 'yy年M月'),
           totalSeconds,
-          hasStudied: totalSeconds > 0
+          hasStudied: totalSeconds > 0,
         };
       });
     } else {
@@ -52,23 +61,25 @@ export function StatisticsPage() {
       startDate = subDays(today, days - 1);
       totalDaysInRange = days;
       const dateRange = eachDayOfInterval({ start: startDate, end: today });
-      
-      chartDataRaw = dateRange.map(date => {
-        const daySessions = sessions.filter(s => isSameDay(new Date(s.startTime), date));
+
+      chartDataRaw = dateRange.map((date) => {
+        const daySessions = filteredSessions.filter((s) =>
+          isSameDay(new Date(s.startTime), date)
+        );
         const totalSeconds = daySessions.reduce((acc, curr) => acc + curr.duration, 0);
         return {
           label: format(date, 'M月d日'),
           totalSeconds,
-          hasStudied: totalSeconds > 0
+          hasStudied: totalSeconds > 0,
         };
       });
     }
 
-    // Determine the appropriate unit for the chart based on the maximum value
-    const maxSeconds = Math.max(...chartDataRaw.map(d => d.totalSeconds));
+    // 根据最大值选择图表单位
+    const maxSeconds = Math.max(...chartDataRaw.map((d) => d.totalSeconds));
     let chartUnit = '秒';
     let chartDataKey = 'durationSeconds';
-    
+
     if (maxSeconds >= 3600) {
       chartUnit = '小时';
       chartDataKey = 'durationHours';
@@ -77,7 +88,7 @@ export function StatisticsPage() {
       chartDataKey = 'durationMinutes';
     }
 
-    const chartData = chartDataRaw.map(d => {
+    const chartData = chartDataRaw.map((d) => {
       let value = d.totalSeconds;
       if (chartUnit === '小时') {
         value = Number((d.totalSeconds / 3600).toFixed(2));
@@ -87,21 +98,24 @@ export function StatisticsPage() {
       return {
         label: d.label,
         [chartDataKey]: value,
-        hasStudied: d.hasStudied
+        hasStudied: d.hasStudied,
       };
     });
 
-    const totalSecondsInRange = sessions
-      .filter(s => new Date(s.startTime) >= startDate)
+    const totalSecondsInRange = filteredSessions
+      .filter((s) => new Date(s.startTime) >= startDate)
       .reduce((acc, curr) => acc + curr.duration, 0);
 
-    const daysStudied = rangeType === 'year' 
-      ? sessions.filter(s => new Date(s.startTime) >= startDate).reduce((acc, curr) => {
-          const day = format(new Date(curr.startTime), 'yyyy-MM-dd');
-          if (!acc.includes(day)) acc.push(day);
-          return acc;
-        }, [] as string[]).length
-      : chartData.filter(d => d.hasStudied).length;
+    const daysStudied =
+      rangeType === 'year'
+        ? filteredSessions
+            .filter((s) => new Date(s.startTime) >= startDate)
+            .reduce((acc, curr) => {
+              const day = format(new Date(curr.startTime), 'yyyy-MM-dd');
+              if (!acc.includes(day)) acc.push(day);
+              return acc;
+            }, [] as string[]).length
+        : chartData.filter((d) => d.hasStudied).length;
 
     const formatTimeValue = (seconds: number) => {
       if (seconds === 0) return { value: '0', unit: '分钟' };
@@ -119,16 +133,21 @@ export function StatisticsPage() {
       totalTime: formatTimeValue(totalSecondsInRange),
       avgTime: formatTimeValue(avgSecondsPerDay),
       daysStudied,
-      totalDaysInRange
+      totalDaysInRange,
     };
-  }, [sessions, rangeType]);
+  }, [filteredSessions, rangeType]);
+
+  // 根据类型获取主题色
+  const isReading = currentType === ActivityType.READING;
+  const chartColor = isReading ? '#059669' : '#6366f1'; // emerald-600 : indigo-600
+  const pageTitle = isReading ? '阅读统计' : '学习统计';
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">学习统计</h2>
+        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">{pageTitle}</h2>
         <div className="flex bg-white rounded-lg p-1 shadow-sm border border-slate-200">
-          {(['7', '14', '30', 'year'] as const).map(range => (
+          {(['7', '14', '30', 'year'] as const).map((range) => (
             <button
               key={range}
               onClick={() => setRangeType(range)}
@@ -151,17 +170,23 @@ export function StatisticsPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">总时长</p>
-            <p className="text-2xl font-bold text-slate-800">{stats.totalTime.value} <span className="text-base font-normal text-slate-500">{stats.totalTime.unit}</span></p>
+            <p className="text-2xl font-bold text-slate-800">
+              {stats.totalTime.value}{' '}
+              <span className="text-base font-normal text-slate-500">{stats.totalTime.unit}</span>
+            </p>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <Target className="w-6 h-6" />
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">日均时长</p>
-            <p className="text-2xl font-bold text-slate-800">{stats.avgTime.value} <span className="text-base font-normal text-slate-500">{stats.avgTime.unit}</span></p>
+            <p className="text-2xl font-bold text-slate-800">
+              {stats.avgTime.value}{' '}
+              <span className="text-base font-normal text-slate-500">{stats.avgTime.unit}</span>
+            </p>
           </div>
         </div>
 
@@ -170,40 +195,50 @@ export function StatisticsPage() {
             <Calendar className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-500">学习天数</p>
-            <p className="text-2xl font-bold text-slate-800">{stats.daysStudied} <span className="text-base font-normal text-slate-500">/ {stats.totalDaysInRange}</span></p>
+            <p className="text-sm font-medium text-slate-500">活动天数</p>
+            <p className="text-2xl font-bold text-slate-800">
+              {stats.daysStudied}{' '}
+              <span className="text-base font-normal text-slate-500">/ {stats.totalDaysInRange}</span>
+            </p>
           </div>
         </div>
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-800 mb-6">学习时长（{stats.chartUnit}）</h3>
+        <h3 className="text-lg font-semibold text-slate-800 mb-6">时长（{stats.chartUnit}）</h3>
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={stats.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <BarChart
+              data={stats.chartData}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis 
-                dataKey="label" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: '#64748b', fontSize: 12 }} 
+              <XAxis
+                dataKey="label"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#64748b', fontSize: 12 }}
                 dy={10}
               />
-              <YAxis 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: '#64748b', fontSize: 12 }} 
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#64748b', fontSize: 12 }}
                 allowDecimals={stats.chartUnit !== '秒'}
               />
               <Tooltip
                 cursor={{ fill: '#f1f5f9' }}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: 'none',
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                }}
               />
-              <Bar 
-                dataKey={stats.chartDataKey} 
-                name="学习时长"
-                fill="#6366f1" 
-                radius={[4, 4, 0, 0]} 
+              <Bar
+                dataKey={stats.chartDataKey}
+                name="时长"
+                fill={chartColor}
+                radius={[4, 4, 0, 0]}
                 maxBarSize={40}
               />
             </BarChart>

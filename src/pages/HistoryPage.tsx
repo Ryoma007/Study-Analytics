@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
-import { useStudyStore, StudySession } from '../store';
+import { useActivityStore, ActivitySession } from '../store';
+import { ActivityType } from '../enums/ActivityType';
 import { format } from 'date-fns';
 import { Trash2, CheckSquare, Square, Plus, Edit2, X, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function HistoryPage() {
-  const { sessions, deleteSessions, addSession, updateSession } = useStudyStore();
+  const sessions = useActivityStore((s) => s.sessions);
+  const currentType = useActivityStore((s) => s.currentType);
+  const deleteSessions = useActivityStore((s) => s.deleteSessions);
+  const addSession = useActivityStore((s) => s.addSession);
+  const updateSession = useActivityStore((s) => s.updateSession);
+
+  // 根据当前类型过滤
+  const filteredSessions = sessions.filter((s) => s.type === currentType);
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [editingSession, setEditingSession] = useState<StudySession | null>(null);
-  
+  const [editingSession, setEditingSession] = useState<ActivitySession | null>(null);
+
   const [formData, setFormData] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     startTime: format(new Date(), 'HH:mm'),
     endTime: format(new Date(), 'HH:mm'),
-    content: ''
+    content: '',
+    type: currentType,
   });
 
   const toggleSelect = (id: string) => {
@@ -25,10 +35,10 @@ export function HistoryPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === sessions.length) {
+    if (selectedIds.length === filteredSessions.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(sessions.map((s) => s.id));
+      setSelectedIds(filteredSessions.map((s) => s.id));
     }
   };
 
@@ -53,24 +63,32 @@ export function HistoryPage() {
     return `${s}秒`;
   };
 
+  /** 将字符串转为 ActivityType 实例 */
+  const parseType = (value: string): ActivityType => {
+    return ActivityType.enumValueOf(value) as ActivityType;
+  };
+
   const handleAdd = () => {
     setEditingSession(null);
+    const currentTypeFromStore = useActivityStore.getState().currentType;
     setFormData({
       date: format(new Date(), 'yyyy-MM-dd'),
       startTime: format(new Date(), 'HH:mm'),
       endTime: format(new Date(), 'HH:mm'),
-      content: ''
+      content: '',
+      type: currentTypeFromStore,
     });
     setIsModalOpen(true);
   };
 
-  const handleEdit = (session: StudySession) => {
+  const handleEdit = (session: ActivitySession) => {
     setEditingSession(session);
     setFormData({
       date: format(new Date(session.startTime), 'yyyy-MM-dd'),
       startTime: format(new Date(session.startTime), 'HH:mm'),
       endTime: format(new Date(session.endTime), 'HH:mm'),
-      content: session.content
+      content: session.content,
+      type: session.type,
     });
     setIsModalOpen(true);
   };
@@ -78,9 +96,9 @@ export function HistoryPage() {
   const handleSave = () => {
     const start = new Date(`${formData.date}T${formData.startTime}`).getTime();
     let end = new Date(`${formData.date}T${formData.endTime}`).getTime();
-    
+
     if (end < start) {
-      // If end time is before start time, assume it's the next day
+      // 如果结束时间早于开始时间，假设跨天
       end += 24 * 60 * 60 * 1000;
     }
 
@@ -92,7 +110,8 @@ export function HistoryPage() {
         startTime: start,
         endTime: end,
         duration,
-        content: formData.content
+        content: formData.content,
+        type: formData.type,
       });
       toast.success('记录已更新');
     } else {
@@ -101,17 +120,25 @@ export function HistoryPage() {
         startTime: start,
         endTime: end,
         duration,
-        content: formData.content
+        content: formData.content,
+        type: formData.type,
       });
       toast.success('记录已添加');
     }
     setIsModalOpen(false);
   };
 
+  // 空状态文案根据类型
+  const emptyText = currentType === ActivityType.READING
+    ? '暂无阅读记录。开始阅读吧！'
+    : '暂无学习记录。开始学习吧！';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">学习历史</h2>
+        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+          {currentType === ActivityType.READING ? '阅读历史' : '学习历史'}
+        </h2>
         <div className="flex gap-3">
           {selectedIds.length > 0 && (
             <button
@@ -133,9 +160,9 @@ export function HistoryPage() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {sessions.length === 0 ? (
+        {filteredSessions.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
-            暂无学习记录。开始学习吧！
+            {emptyText}
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
@@ -143,7 +170,7 @@ export function HistoryPage() {
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-sm font-medium uppercase tracking-wider">
                 <th className="p-4 w-12 text-center">
                   <button onClick={toggleSelectAll} className="hover:text-indigo-600 transition-colors">
-                    {selectedIds.length === sessions.length && sessions.length > 0 ? (
+                    {selectedIds.length === filteredSessions.length && filteredSessions.length > 0 ? (
                       <CheckSquare className="w-5 h-5" />
                     ) : (
                       <Square className="w-5 h-5" />
@@ -158,7 +185,7 @@ export function HistoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sessions.map((session) => (
+              {filteredSessions.map((session) => (
                 <tr
                   key={session.id}
                   className={`hover:bg-slate-50 transition-colors ${
@@ -211,7 +238,7 @@ export function HistoryPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-800">
-                {editingSession ? '编辑学习记录' : '手动添加记录'}
+                {editingSession ? '编辑记录' : '手动添加记录'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -220,8 +247,21 @@ export function HistoryPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-4">
+              {/* 活动类型选择器 */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">活动类型</label>
+                <select
+                  value={formData.type.enumKey}
+                  onChange={(e) => setFormData({ ...formData, type: parseType(e.target.value) })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                >
+                  <option value="STUDY">学习</option>
+                  <option value="READING">阅读</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">日期</label>
                 <input
@@ -231,7 +271,7 @@ export function HistoryPage() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">开始时间</label>
@@ -252,19 +292,19 @@ export function HistoryPage() {
                   />
                 </div>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">学习内容</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">内容描述</label>
                 <textarea
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                  placeholder="记录一下学习了什么..."
+                  placeholder="记录一下..."
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-100 bg-slate-50">
               <button
                 onClick={() => setIsModalOpen(false)}
