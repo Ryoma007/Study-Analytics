@@ -167,6 +167,14 @@ CREATE TABLE active_session (
 
 - `better-sqlite3` 同步 API 是**全局"禁同步 API"规则的项目级明确例外**，仅限 SQLite 数据访问层；其它文件 I/O 仍守禁同步规则。不得以"遵循全局规则"为由改回异步驱动。
 - 不引入 ORM，直接用 prepared statements 裸 SQL。统计聚合用 SQL `GROUP BY`。
+- `better-sqlite3` 不自动建 DB 父目录，`createDb` 已用 `mkdirSync(recursive)` 兜底；新增 DB 路径需确保父目录可建或已被此逻辑覆盖。
+- DB 路径：dev 落仓库根 `data/study.db`（`server.ts` 用 `__dirname` 定位，不依赖 cwd）；生产由 `DB_PATH` env 覆盖为 `/app/data/study.db`。不要改回 `process.cwd()`——dev（apps/backend）与生产（/app）cwd 不同会漂移。
+
+### 端口与 Windows 环境陷阱
+
+- 后端固定 **3002**（避开常用端口），前端 dev 仍 3001，生产容器内 3002 映射 47291。
+- EADDRINUSE 3002 排查：`netstat -ano | grep ":3002" | grep LISTENING` 找 PID → `taskkill //F //PID <PID>`。
+- Windows `git mv` 遇 IDE 锁文件会 Permission denied。关 IDE 或改用普通 `mv` + `git add -A`，git 仍能识别为重命名（R 标记，历史保留）。
 
 ### 配置表模式（activityConfig，纯前端）
 
