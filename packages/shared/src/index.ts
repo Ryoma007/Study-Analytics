@@ -1,3 +1,5 @@
-// 共享包入口 —— 前后端共享的类型契约与纯函数
-// 阶段1为占位，阶段2填充类型定义（ActivitySession/ActiveSession/ActivityType/API DTO 等）
-export {};
+// 共享包入口 —— 前后端共享的类型契约与纯函数（零运行时依赖）
+export * from './enums';
+export * from './constants';
+export * from './types';
+export * from './api';

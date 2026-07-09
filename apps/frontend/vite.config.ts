@@ -13,8 +13,6 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
-        // 共享包别名，指向 workspaces 中的 packages/shared
-        '@shared': path.resolve(__dirname, '../../packages/shared/src'),
       },
     },
     server: {
