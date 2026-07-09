@@ -103,6 +103,8 @@ pnpm clean
 
 **关键陷阱：自定义 `StateStorage.getItem` 返回值会经过双重 JSON 解析。** `getItem` 返回字符串 → `createJSONStorage` 内部 `JSON.parse` → Zustand merge。类型恢复逻辑应在 `activityMerge` 中处理（水化最后一步）。当前 `activityMerge` 兼容旧版 Enumify `{enumKey:"X"}` 格式，自动迁移为纯字符串。
 
+**陷阱：`isTimerRunning` 是瞬态状态，不持久化。** 它是计时器组件运行状态的**镜像**，真实运行态（`useTimer` 的 `isRunning`）是组件本地 state，刷新即丢失。若持久化它会导致"幽灵运行状态"——启动计时器未停止就关页面，下次打开 UI 未在计时却因恢复 `true` 而永久禁用类型切换器。store 用 `partialize` 只持久化 `sessions` + `currentType`（**不写入** `isTimerRunning`），`activityMerge` 强制 `merged.isTimerRunning = false`（新会话起始必然未启动，同时清理旧脏数据）。改 `isTimerRunning` 相关逻辑时注意：它只反映当前会话运行态，不应跨会话保留。
+
 ### 计时器精度：基于系统时钟
 
 `TimerPage.tsx` 不使用 `setInterval` 累加计数，而是记录 `lastStartTime`（`Date.now()`），展示时间为 `accumulatedTime + 当前分段`。同时监听 `visibilitychange` 事件，标签页恢复可见时立即校准显示时间。

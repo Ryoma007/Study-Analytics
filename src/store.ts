@@ -77,31 +77,35 @@ const migrateSession = (session: LegacySession | ActivitySession): ActivitySessi
 /**
  * 自定义 persist merge 函数
  * 处理旧版 Enumify 序列化格式的兼容迁移
+ * 入参类型对齐 Zustand PersistOptions.merge 的签名（persistedState: unknown）
  */
 export const activityMerge = (
-  persisted: Partial<ActivityState> | null | undefined,
-  current: ActivityState
+  persistedState: unknown,
+  currentState: ActivityState
 ): ActivityState => {
-  if (!persisted || typeof persisted !== 'object') return current;
+  const persisted = persistedState as Partial<ActivityState> | null | undefined;
+  if (!persisted || typeof persisted !== 'object') return currentState;
 
-  const merged = { ...current, ...persisted } as ActivityState;
+  const merged = { ...currentState, ...persisted } as ActivityState;
 
   // 兼容旧版 Enumify 序列化格式 {enumKey:"X"} → 纯字符串
   const rawType = (persisted as Record<string, unknown>).currentType;
   if (rawType !== undefined && rawType !== null) {
     merged.currentType = normalizeType(rawType);
   } else {
-    // 缺失或为 null 时使用 current 的初始值
-    merged.currentType = current.currentType;
+    // 缺失或为 null 时使用 currentState 的初始值
+    merged.currentType = currentState.currentType;
   }
 
   if (Array.isArray(merged.sessions)) {
     merged.sessions = merged.sessions.map(migrateSession);
   }
 
-  if (merged.isTimerRunning === undefined || merged.isTimerRunning === null) {
-    merged.isTimerRunning = false;
-  }
+  // 永远重置为 false：isTimerRunning 是计时器组件的瞬态运行状态镜像，
+  // 真实运行态（useTimer 的 isRunning）是组件本地 state，刷新即丢失。
+  // 若保留持久化的 true，会导致"幽灵运行状态"——UI 未在计时却永久禁用类型切换器。
+  // 新会话起始时计时器必然未启动，故强制重置。
+  merged.isTimerRunning = false;
 
   return merged;
 };
@@ -202,6 +206,13 @@ export const useActivityStore = create<ActivityState>()(
       name: STORAGE_KEY,
       storage: createJSONStorage(() => idbStorage),
       merge: activityMerge,
+      // 只持久化 sessions 和 currentType。
+      // isTimerRunning 是计时器组件的瞬态运行状态镜像，真实运行态随组件卸载/刷新而丢失，
+      // 持久化它会导致"幽灵运行状态"——刷新后 UI 未在计时却因恢复 true 而永久禁用类型切换器。
+      partialize: (state) => ({
+        sessions: state.sessions,
+        currentType: state.currentType,
+      }),
     }
   )
 );
