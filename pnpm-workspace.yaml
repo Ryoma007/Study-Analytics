@@ -1,0 +1,4 @@
+# pnpm workspaces 配置：apps 下的子应用 + packages 下的共享包
+packages:
+  - 'apps/*'
+  - 'packages/*'
