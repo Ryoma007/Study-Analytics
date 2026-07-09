@@ -166,6 +166,15 @@ interface ActivitySession {
 
 当前项目为纯前端应用，所有数据存储在浏览器 IndexedDB 中。`package.json` 的 dependencies 中有 `express` 和 `@types/express`，但目前 `server/` 目录不存在，属于预留依赖。
 
+## CI/CD
+
+- GitHub Actions 工作流 `.github/workflows/docker-build-push.yml`，push to main + `workflow_dispatch` 手动触发
+- Docker 镜像 `ryoma9426/study-analytics`，推送到 Docker Hub，tag 为 `latest` + git commit SHA
+- **关键陷阱：`pnpm/action-setup@v4` 不要写 `version` 参数**，`package.json` 的 `packageManager` 字段已声明版本，重复指定会报 `Multiple versions of pnpm specified` 错误
+- GitHub Actions 已弃用 Node 20，`setup-node` 必须用 `node-version: 22` 或更高
+- **nginx 缓存策略**：`index.html` 设为 `no-cache`，带 hash 的 JS/CSS 设为 `max-age=31536000, immutable`，否则部署后浏览器缓存旧入口导致白屏
+- Docker Hub 认证通过 GitHub Secrets：`DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`
+
 ## Agent skills
 
 ### Issue tracker
