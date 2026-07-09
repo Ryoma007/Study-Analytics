@@ -3,13 +3,19 @@
  * 端口默认 3002（避开常用端口）。生产态静态托管前端见 ADR-0005，阶段4启用（SERVE_STATIC=1）
  */
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createDb } from './db';
 import { createApp, createAppContext } from './routes';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** 后端监听端口（默认 3002，避开常用端口） */
 const PORT = Number(process.env.PORT ?? 3002);
-/** 数据库文件路径（默认 ./data/study.db，挂卷持久化；测试用 :memory:） */
-const DB_PATH = process.env.DB_PATH ?? path.resolve(process.cwd(), 'data/study.db');
+/**
+ * 数据库文件路径（默认 <仓库根>/data/study.db，挂卷持久化；测试用 :memory:）
+ * 用 __dirname 相对定位到仓库根，避免 dev（cwd=apps/backend）与生产（cwd=/app）路径漂移
+ */
+const DB_PATH = process.env.DB_PATH ?? path.resolve(__dirname, '../../../data/study.db');
 
 const db = createDb(DB_PATH);
 const ctx = createAppContext(db);

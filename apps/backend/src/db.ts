@@ -4,6 +4,8 @@
  * 仅限本数据访问层使用同步 API，其它文件 I/O 仍守禁同步规则
  */
 import BetterSqlite3, { type Database } from 'better-sqlite3';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { HEARTBEAT_TIMEOUT_MS } from '@study-analytics/shared';
 
 /**
@@ -11,6 +13,10 @@ import { HEARTBEAT_TIMEOUT_MS } from '@study-analytics/shared';
  * @param dbPath 数据库文件路径，传 ":memory:" 用于测试（每个测试隔离）
  */
 export function createDb(dbPath: string): Database {
+  // better-sqlite3 不会自动建目录，需先确保父目录存在（建目录属开 DB 前置，纳入 ADR-0002 SQLite 数据层例外）
+  if (dbPath !== ':memory:') {
+    mkdirSync(dirname(dbPath), { recursive: true });
+  }
   // eslint-disable-next-line new-cap -- better-sqlite3 默认导出为构造函数
   const db = new BetterSqlite3(dbPath);
   // 开启 WAL 以提升并发读（单用户收益有限，但顺带开启无害）
