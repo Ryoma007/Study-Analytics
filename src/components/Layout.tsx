@@ -1,35 +1,18 @@
 import React from 'react';
 import { BookOpen, Clock, History, BarChart2 } from 'lucide-react';
 import { useActivityStore } from '../store';
-import { ActivityType } from '../enums/ActivityType';
+import { ActivityType, ACTIVITY_TYPES } from '../enums/ActivityType';
+import { getActivityConfig } from '../config/activityConfig';
 
 interface LayoutProps {
   children: React.ReactNode;
   currentTab: string;
   onTabChange: (tab: string) => void;
+  /** 是否隐藏活动类型切换器（统计页等不需要切换器的页面使用） */
+  hideTypeSwitcher?: boolean;
 }
 
-// 根据 ActivityType 实例获取主题色
-const getTheme = (type: ActivityType) => {
-  if (type === ActivityType.READING) {
-    return {
-      primary: 'emerald',
-      logoBg: 'bg-emerald-600',
-      activeBg: 'bg-emerald-50',
-      activeText: 'text-emerald-700',
-      iconColor: 'text-emerald-600',
-    } as const;
-  }
-  return {
-    primary: 'indigo',
-    logoBg: 'bg-indigo-600',
-    activeBg: 'bg-indigo-50',
-    activeText: 'text-indigo-700',
-    iconColor: 'text-indigo-600',
-  } as const;
-};
-
-export function Layout({ children, currentTab, onTabChange }: LayoutProps) {
+export function Layout({ children, currentTab, onTabChange, hideTypeSwitcher = false }: LayoutProps) {
   // 从 store 读取当前类型和计时器状态
   const currentType = useActivityStore((s) => s.currentType);
   const isTimerRunning = useActivityStore((s) => s.isTimerRunning);
@@ -41,7 +24,7 @@ export function Layout({ children, currentTab, onTabChange }: LayoutProps) {
     { id: 'statistics', label: '数据统计', icon: BarChart2 },
   ];
 
-  const theme = getTheme(currentType);
+  const theme = getActivityConfig(currentType).color.tailwind;
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900">
@@ -55,34 +38,27 @@ export function Layout({ children, currentTab, onTabChange }: LayoutProps) {
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">时间记录</h1>
         </div>
 
-        {/* 活动类型切换（分段按钮），统计页隐藏 */}
-        {currentTab !== 'statistics' && (
+        {/* 活动类型切换（分段按钮） */}
+        {!hideTypeSwitcher && (
           <div className="px-4 py-3 border-b border-slate-100">
             <div className="flex rounded-lg bg-slate-100 p-1">
-              {/* 学习按钮 */}
-              <button
-                onClick={() => setCurrentType(ActivityType.STUDY)}
-                disabled={isTimerRunning}
-                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                  currentType === ActivityType.STUDY
-                    ? 'bg-white text-slate-800 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                } ${isTimerRunning ? 'cursor-not-allowed opacity-60' : ''}`}
-              >
-                学习
-              </button>
-              {/* 阅读按钮 */}
-              <button
-                onClick={() => setCurrentType(ActivityType.READING)}
-                disabled={isTimerRunning}
-                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                  currentType === ActivityType.READING
-                    ? 'bg-white text-slate-800 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                } ${isTimerRunning ? 'cursor-not-allowed opacity-60' : ''}`}
-              >
-                阅读
-              </button>
+              {ACTIVITY_TYPES.map((type) => {
+                const isActive = currentType === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setCurrentType(type)}
+                    disabled={isTimerRunning}
+                    className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                      isActive
+                        ? 'bg-white text-slate-800 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    } ${isTimerRunning ? 'cursor-not-allowed opacity-60' : ''}`}
+                  >
+                    {getActivityConfig(type).label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

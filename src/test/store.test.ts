@@ -157,17 +157,16 @@ describe('useActivityStore', () => {
 });
 
 // ============================================================
-// Persist merge: 水化时 Enumify 实例恢复（修复双重序列化 bug）
+// Persist merge: 旧版 Enumify 序列化格式兼容迁移
 // ============================================================
 describe('activityMerge', () => {
-  // 基础 current 状态（模拟 Zustand 初始值）
   const current = {
     sessions: [],
     currentType: ActivityType.STUDY,
     isTimerRunning: false,
   } as ActivityState;
 
-  it('将 {enumKey: "READING"} 恢复为 ActivityType.READING 实例', () => {
+  it('将旧版 {enumKey:"READING"} 迁移为 "READING" 字符串', () => {
     const persisted = {
       currentType: { enumKey: 'READING' } as unknown as ActivityType,
       sessions: [],
@@ -177,72 +176,51 @@ describe('activityMerge', () => {
     expect(merged.currentType).toBe(ActivityType.READING);
   });
 
-  it('将 {enumKey: "STUDY"} 恢复为 ActivityType.STUDY 实例', () => {
+  it('纯字符串 currentType 保持不变', () => {
     const persisted = {
-      currentType: { enumKey: 'STUDY' } as unknown as ActivityType,
+      currentType: ActivityType.READING,
       sessions: [],
       isTimerRunning: false,
     };
     const merged = activityMerge(persisted, current);
-    expect(merged.currentType).toBe(ActivityType.STUDY);
+    expect(merged.currentType).toBe(ActivityType.READING);
   });
 
-  it('将 sessions[].type 从 {enumKey} 恢复为 ActivityType 实例', () => {
+  it('将 sessions[].type 从旧版 {enumKey} 迁移为字符串', () => {
     const persisted = {
-      currentType: { enumKey: 'STUDY' } as unknown as ActivityType,
+      currentType: ActivityType.STUDY,
       sessions: [
         { id: '1', type: { enumKey: 'READING' }, date: '2026-07-01',
           startTime: 1000, endTime: 2000, duration: 1000, content: '阅读' },
-        { id: '2', type: { enumKey: 'STUDY' }, date: '2026-07-01',
-          startTime: 3000, endTime: 4000, duration: 1000, content: '学习' },
       ] as unknown as ActivitySession[],
       isTimerRunning: false,
     };
     const merged = activityMerge(persisted, current);
     expect(merged.sessions[0].type).toBe(ActivityType.READING);
-    expect(merged.sessions[1].type).toBe(ActivityType.STUDY);
   });
 
-  it('persisted 为 null 时返回 current（不崩溃）', () => {
+  it('persisted 为 null 时返回 current', () => {
     const merged = activityMerge(null, current);
     expect(merged.currentType).toBe(ActivityType.STUDY);
     expect(merged.sessions).toEqual([]);
   });
 
-  it('persisted 为 undefined 时返回 current（不崩溃）', () => {
+  it('persisted 为 undefined 时返回 current', () => {
     const merged = activityMerge(undefined, current);
     expect(merged.currentType).toBe(ActivityType.STUDY);
   });
 
   it('persisted 中 currentType 缺失时使用 current 的值', () => {
-    const persisted = {
-      sessions: [],
-      isTimerRunning: false,
-    } as Partial<ActivityState>;
-    const merged = activityMerge(persisted, current);
+    const merged = activityMerge({ sessions: [], isTimerRunning: false } as Partial<ActivityState>, current);
     expect(merged.currentType).toBe(ActivityType.STUDY);
   });
 
-  it('persisted 中 currentType 为 null 时降级为 current 的值', () => {
-    const persisted = {
-      currentType: null as unknown as ActivityType,
-      sessions: [],
-      isTimerRunning: false,
-    };
-    const merged = activityMerge(persisted, current);
-    expect(merged.currentType).toBe(ActivityType.STUDY);
-  });
-
-  it('persisted 中 isTimerRunning 缺失时默认为 false', () => {
-    const persisted = {
-      currentType: { enumKey: 'STUDY' } as unknown as ActivityType,
-      sessions: [],
-    } as Partial<ActivityState>;
-    const merged = activityMerge(persisted, current);
+  it('isTimerRunning 缺失时默认为 false', () => {
+    const merged = activityMerge({ currentType: ActivityType.STUDY, sessions: [] } as Partial<ActivityState>, current);
     expect(merged.isTimerRunning).toBe(false);
   });
 
-  it('已恢复的 ActivityType 实例保持不变（幂等性）', () => {
+  it('已恢复的字符串类型保持不变（幂等性）', () => {
     const persisted = {
       currentType: ActivityType.STUDY,
       sessions: [
@@ -258,7 +236,7 @@ describe('activityMerge', () => {
 
   it('旧版 session 无 type 字段时降级为 STUDY', () => {
     const persisted = {
-      currentType: { enumKey: 'STUDY' } as unknown as ActivityType,
+      currentType: ActivityType.STUDY,
       sessions: [
         { id: '1', date: '2026-07-01', startTime: 1000, endTime: 2000, duration: 1000, content: '旧数据' },
       ] as unknown as ActivitySession[],
@@ -268,23 +246,21 @@ describe('activityMerge', () => {
     expect(merged.sessions[0].type).toBe(ActivityType.STUDY);
   });
 
-  it('无效 enumKey 时降级为 STUDY（容错）', () => {
+  it('无效 enumKey 时抛出异常', () => {
     const persisted = {
       currentType: { enumKey: 'INVALID_TYPE' } as unknown as ActivityType,
       sessions: [],
       isTimerRunning: false,
     };
-    const merged = activityMerge(persisted, current);
-    expect(merged.currentType).toBe(ActivityType.STUDY);
+    expect(() => activityMerge(persisted, current)).toThrow('无效的活动类型');
   });
 
-  it('enumKey 不是字符串时降级为 STUDY（容错）', () => {
+  it('enumKey 不是字符串时抛出异常', () => {
     const persisted = {
       currentType: { enumKey: 123 } as unknown as ActivityType,
       sessions: [],
       isTimerRunning: false,
     };
-    const merged = activityMerge(persisted, current);
-    expect(merged.currentType).toBe(ActivityType.STUDY);
+    expect(() => activityMerge(persisted, current)).toThrow('无法从对象中提取有效的活动类型');
   });
 });

@@ -125,8 +125,13 @@ describe('Layout', () => {
   });
 
   // === L1: 统计页隐藏类型切换 ===
-  it('数据统计页不渲染类型切换按钮', () => {
-    renderLayout('statistics');
+  it('hideTypeSwitcher=true 时不渲染类型切换按钮', () => {
+    const onTabChange = vi.fn();
+    render(
+      <Layout currentTab="statistics" onTabChange={onTabChange} hideTypeSwitcher>
+        <div data-testid="content">page content</div>
+      </Layout>
+    );
     expect(screen.queryByText('学习')).toBeNull();
     expect(screen.queryByText('阅读')).toBeNull();
   });

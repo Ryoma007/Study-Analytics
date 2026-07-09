@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { get, set, del } from 'idb-keyval';
-import { ActivityType } from './enums/ActivityType';
+import { ActivityType, activityTypeFromValue } from './enums/ActivityType';
 
 /** 活动记录数据模型 */
 export interface ActivitySession {
@@ -50,79 +50,55 @@ export interface ActivityState {
 const STORAGE_KEY = 'activity_sessions_storage';
 const LEGACY_STORAGE_KEY = 'study_sessions_storage';
 
-/** 检查记录是否缺少 type 字段（旧版数据） */
-const isLegacySession = (session: unknown): session is LegacySession => {
-  if (!session || typeof session !== 'object') return true;
-  const s = session as Record<string, unknown>;
-  return s.type === undefined || s.type === null;
+/**
+ * 将旧版 Enumify 序列化格式 {enumKey:"X"} 迁移为纯字符串
+ * 新版 ActivityType 是字符串联合类型，无需实例化
+ * 无效值直接抛异常，不静默降级
+ */
+const normalizeType = (rawType: unknown): ActivityType => {
+  if (typeof rawType === 'string') return activityTypeFromValue(rawType);
+  if (rawType && typeof rawType === 'object' && 'enumKey' in (rawType as Record<string, unknown>)) {
+    const key = (rawType as Record<string, unknown>).enumKey;
+    if (typeof key === 'string') return activityTypeFromValue(key);
+    throw new Error(`无法从对象中提取有效的活动类型 enumKey: ${JSON.stringify(rawType)}`);
+  }
+  throw new Error(`无法解析活动类型，期望字符串或 {enumKey} 对象，实际: ${typeof rawType} ${JSON.stringify(rawType)}`);
 };
 
 /** 将旧版记录迁移为新版，缺失 type 默认归为 STUDY */
 const migrateSession = (session: LegacySession | ActivitySession): ActivitySession => {
-  if (isLegacySession(session)) {
-    return {
-      ...session,
-      type: (session as any).type ?? ActivityType.STUDY,
-    } as ActivitySession;
+  const s = session as unknown as Record<string, unknown>;
+  if (typeof s.type === 'undefined' || s.type === null) {
+    return { ...(s as unknown as ActivitySession), type: ActivityType.STUDY };
   }
-  // enumify 反序列化：将普通对象转换为 ActivityType 实例
-  const s = session as ActivitySession & { type: unknown };
-  if (typeof s.type === 'object' && s.type !== null && 'enumKey' in s.type) {
-    const typeName = (s.type as { enumKey: string }).enumKey;
-    try {
-      // enumValueOf 对无效 key 返回 undefined（不抛异常），需 || 兜底
-      s.type = ActivityType.enumValueOf(typeName) || ActivityType.STUDY;
-    } catch {
-      s.type = ActivityType.STUDY;
-    }
-  }
-  return s;
+  return { ...(s as unknown as ActivitySession), type: normalizeType(s.type) };
 };
 
 /**
  * 自定义 persist merge 函数
- * 将水化后的普通对象恢复为 Enumify 实例
- * createJSONStorage 的 JSON.parse 会将 ActivityType 实例变为 {enumKey: "X"}
- * 此函数在 persist 合并阶段将其恢复为真正的 ActivityType 实例
+ * 处理旧版 Enumify 序列化格式的兼容迁移
  */
 export const activityMerge = (
   persisted: Partial<ActivityState> | null | undefined,
   current: ActivityState
 ): ActivityState => {
-  // persisted 为 null/undefined 时使用初始值兜底
-  if (!persisted || typeof persisted !== 'object') {
-    return current;
-  }
+  if (!persisted || typeof persisted !== 'object') return current;
 
-  // 标准合并：persisted 覆盖 current
   const merged = { ...current, ...persisted } as ActivityState;
 
-  // --- 恢复 currentType ---
+  // 兼容旧版 Enumify 序列化格式 {enumKey:"X"} → 纯字符串
   const rawType = (persisted as Record<string, unknown>).currentType;
-  if (rawType && typeof rawType === 'object' && !(rawType instanceof ActivityType)) {
-    const enumKey = (rawType as Record<string, unknown>).enumKey;
-    if (typeof enumKey === 'string') {
-      try {
-        // enumValueOf 对无效 key 返回 undefined（不抛异常），需 || 兜底
-        merged.currentType = ActivityType.enumValueOf(enumKey) || ActivityType.STUDY;
-      } catch {
-        merged.currentType = ActivityType.STUDY;
-      }
-    } else {
-      merged.currentType = ActivityType.STUDY;
-    }
-  } else if (!rawType) {
-    // persisted 中无 currentType（首次访问或新字段），使用 current 的值
+  if (rawType !== undefined && rawType !== null) {
+    merged.currentType = normalizeType(rawType);
+  } else {
+    // 缺失或为 null 时使用 current 的初始值
     merged.currentType = current.currentType;
   }
-  // else: rawType 已经是 ActivityType 实例，保持不变
 
-  // --- 恢复 sessions[].type ---
   if (Array.isArray(merged.sessions)) {
     merged.sessions = merged.sessions.map(migrateSession);
   }
 
-  // --- isTimerRunning 默认值 ---
   if (merged.isTimerRunning === undefined || merged.isTimerRunning === null) {
     merged.isTimerRunning = false;
   }

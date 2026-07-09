@@ -20,9 +20,6 @@ dependencies:
   dotenv:
     specifier: ^17.2.3
     version: 17.4.2
-  enumify:
-    specifier: ^2.0.0
-    version: 2.0.0
   express:
     specifier: ^4.21.2
     version: 4.22.2
@@ -1921,10 +1918,6 @@ packages:
     resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
     engines: {node: '>=20.19.0'}
     dev: true
-
-  /enumify@2.0.0:
-    resolution: {integrity: sha512-hpyRdixXrBdr1sZOWH/WKBleMtHWVbM+DyVa0OqKQnKEw6x0TuUNYjcWKlp5/+tdiOsbgYiaZ/pYUeMake4k8A==}
-    dev: false
 
   /es-define-property@1.0.1:
     resolution: {integrity: sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g==}

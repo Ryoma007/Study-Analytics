@@ -1,17 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { useActivityStore } from '../store';
-import { ActivityType } from '../enums/ActivityType';
-import {
-  format,
-  subDays,
-  isSameDay,
-  startOfDay,
-  eachDayOfInterval,
-  subMonths,
-  startOfMonth,
-  isSameMonth,
-  eachMonthOfInterval,
-} from 'date-fns';
+import { ActivityType, ACTIVITY_TYPES } from '../enums/ActivityType';
+import { getActivityConfig } from '../config/activityConfig';
+import { type FormattedTime } from '../utils/time';
 import {
   BarChart,
   Bar,
@@ -23,153 +14,12 @@ import {
   Legend,
 } from 'recharts';
 import { Calendar, Clock, Target } from 'lucide-react';
-
-// 图表颜色常量
-const STUDY_COLOR = '#6366f1'; // indigo-500
-const READING_COLOR = '#059669'; // emerald-600
-
-/** 图表数据点结构 */
-interface ChartDataPoint {
-  label: string;
-  study: number;
-  reading: number;
-}
-
-/** 格式化时间值的返回结构 */
-interface FormattedTime {
-  value: string;
-  unit: string;
-}
-
-/**
- * 根据秒数自适应格式化时间值
- * >= 3600 秒用小时，>= 60 秒用分钟，否则用秒
- */
-const formatTimeValue = (seconds: number): FormattedTime => {
-  if (seconds === 0) return { value: '0', unit: '分钟' };
-  if (seconds < 60) return { value: Math.round(seconds).toString(), unit: '秒' };
-  if (seconds < 3600) return { value: (seconds / 60).toFixed(1), unit: '分钟' };
-  return { value: (seconds / 3600).toFixed(2), unit: '小时' };
-};
+import { useStatistics } from '../hooks/useStatistics';
+import { StatTooltip } from '../components/StatTooltip';
 
 export function StatisticsPage() {
   const sessions = useActivityStore((s) => s.sessions);
-  const [rangeType, setRangeType] = useState<'7' | '14' | '30' | 'year'>('7');
-
-  const stats = useMemo(() => {
-    const today = startOfDay(new Date());
-
-    // 按类型拆分数据
-    const studySessions = sessions.filter((s) => s.type === ActivityType.STUDY);
-    const readingSessions = sessions.filter((s) => s.type === ActivityType.READING);
-
-    let chartDataRaw: { label: string; studySeconds: number; readingSeconds: number }[] = [];
-    let startDate: Date;
-    let totalDaysInRange: number;
-
-    if (rangeType === 'year') {
-      startDate = startOfMonth(subMonths(today, 11));
-      totalDaysInRange = 365;
-      const monthRange = eachMonthOfInterval({ start: startDate, end: today });
-
-      chartDataRaw = monthRange.map((month) => {
-        const studyTotal = studySessions
-          .filter((s) => isSameMonth(new Date(s.startTime), month))
-          .reduce((acc, curr) => acc + curr.duration, 0);
-        const readingTotal = readingSessions
-          .filter((s) => isSameMonth(new Date(s.startTime), month))
-          .reduce((acc, curr) => acc + curr.duration, 0);
-        return {
-          label: format(month, 'yy年M月'),
-          studySeconds: studyTotal,
-          readingSeconds: readingTotal,
-        };
-      });
-    } else {
-      const days = parseInt(rangeType);
-      startDate = subDays(today, days - 1);
-      totalDaysInRange = days;
-      const dateRange = eachDayOfInterval({ start: startDate, end: today });
-
-      chartDataRaw = dateRange.map((date) => {
-        const studyTotal = studySessions
-          .filter((s) => isSameDay(new Date(s.startTime), date))
-          .reduce((acc, curr) => acc + curr.duration, 0);
-        const readingTotal = readingSessions
-          .filter((s) => isSameDay(new Date(s.startTime), date))
-          .reduce((acc, curr) => acc + curr.duration, 0);
-        return {
-          label: format(date, 'M月d日'),
-          studySeconds: studyTotal,
-          readingSeconds: readingTotal,
-        };
-      });
-    }
-
-    // 根据两类型全局最大值选择图表单位
-    const maxSeconds = Math.max(
-      ...chartDataRaw.map((d) => Math.max(d.studySeconds, d.readingSeconds))
-    );
-    let chartUnit: string;
-    let divisor: number;
-    let decimals: number;
-
-    if (maxSeconds >= 3600) {
-      chartUnit = '小时';
-      divisor = 3600;
-      decimals = 2;
-    } else if (maxSeconds >= 60) {
-      chartUnit = '分钟';
-      divisor = 60;
-      decimals = 1;
-    } else {
-      chartUnit = '秒';
-      divisor = 1;
-      decimals = 0;
-    }
-
-    // 转换图表数据
-    const chartData: ChartDataPoint[] = chartDataRaw.map((d) => ({
-      label: d.label,
-      study: Number((d.studySeconds / divisor).toFixed(decimals)),
-      reading: Number((d.readingSeconds / divisor).toFixed(decimals)),
-    }));
-
-    // 计算各类型汇总数据
-    const recentFilter = (s: { startTime: number }) => new Date(s.startTime) >= startDate;
-
-    const studyTotalSeconds = studySessions.filter(recentFilter).reduce((acc, curr) => acc + curr.duration, 0);
-    const readingTotalSeconds = readingSessions.filter(recentFilter).reduce((acc, curr) => acc + curr.duration, 0);
-
-    // 活动天数（去重计数）
-    const countDays = (sessionsList: typeof sessions) =>
-      sessionsList
-        .filter(recentFilter)
-        .reduce((acc, curr) => {
-          const day = format(new Date(curr.startTime), 'yyyy-MM-dd');
-          if (!acc.includes(day)) acc.push(day);
-          return acc;
-        }, [] as string[]).length;
-
-    const studyDays = countDays(studySessions);
-    const readingDays = countDays(readingSessions);
-
-    // 日均时长
-    const studyAvgSeconds = studyTotalSeconds / totalDaysInRange;
-    const readingAvgSeconds = readingTotalSeconds / totalDaysInRange;
-
-    return {
-      chartData,
-      chartUnit,
-      studyTotal: formatTimeValue(studyTotalSeconds),
-      readingTotal: formatTimeValue(readingTotalSeconds),
-      studyAvg: formatTimeValue(studyAvgSeconds),
-      readingAvg: formatTimeValue(readingAvgSeconds),
-      studyDays,
-      readingDays,
-      totalDaysInRange,
-    };
-  }, [sessions, rangeType]);
+  const { stats, rangeType, setRangeType } = useStatistics(sessions);
 
   // 渲染单个统计卡片行（带颜色圆点）
   const renderStatRow = (label: string, time: FormattedTime, color: string) => (
@@ -195,27 +45,18 @@ export function StatisticsPage() {
     </div>
   );
 
-  /** 自定义 Tooltip 组件 */
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload || payload.length === 0) return null;
-    return (
-      <div
-        style={{
-          borderRadius: '12px',
-          border: 'none',
-          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-          background: '#fff',
-          padding: '10px 14px',
-        }}
-      >
-        <p className="text-sm font-medium text-slate-600 mb-1">{label}</p>
-        {payload.map((entry: any, idx: number) => (
-          <p key={idx} className="text-sm font-semibold" style={{ color: entry.color }}>
-            {entry.name}: {entry.value} {stats.chartUnit}
-          </p>
-        ))}
-      </div>
-    );
+  // 构建类型 → 统计值的映射（驱动卡片行渲染）
+  const typeStatsMap = {
+    [ActivityType.STUDY]: {
+      total: stats.studyTotal,
+      avg: stats.studyAvg,
+      days: stats.studyDays,
+    },
+    [ActivityType.READING]: {
+      total: stats.readingTotal,
+      avg: stats.readingAvg,
+      days: stats.readingDays,
+    },
   };
 
   return (
@@ -251,8 +92,10 @@ export function StatisticsPage() {
             <p className="text-sm font-medium text-slate-500">总时长</p>
           </div>
           <div className="space-y-2">
-            {renderStatRow('学习', stats.studyTotal, STUDY_COLOR)}
-            {renderStatRow('阅读', stats.readingTotal, READING_COLOR)}
+            {ACTIVITY_TYPES.map((type) => {
+              const cfg = getActivityConfig(type);
+              return renderStatRow(cfg.label, typeStatsMap[type].total, cfg.color.hex);
+            })}
           </div>
         </div>
 
@@ -265,8 +108,10 @@ export function StatisticsPage() {
             <p className="text-sm font-medium text-slate-500">日均时长</p>
           </div>
           <div className="space-y-2">
-            {renderStatRow('学习', stats.studyAvg, STUDY_COLOR)}
-            {renderStatRow('阅读', stats.readingAvg, READING_COLOR)}
+            {ACTIVITY_TYPES.map((type) => {
+              const cfg = getActivityConfig(type);
+              return renderStatRow(cfg.label, typeStatsMap[type].avg, cfg.color.hex);
+            })}
           </div>
         </div>
 
@@ -279,8 +124,10 @@ export function StatisticsPage() {
             <p className="text-sm font-medium text-slate-500">活动天数</p>
           </div>
           <div className="space-y-2">
-            {renderDaysRow('学习', stats.studyDays, STUDY_COLOR)}
-            {renderDaysRow('阅读', stats.readingDays, READING_COLOR)}
+            {ACTIVITY_TYPES.map((type) => {
+              const cfg = getActivityConfig(type);
+              return renderDaysRow(cfg.label, typeStatsMap[type].days, cfg.color.hex);
+            })}
           </div>
         </div>
       </div>
@@ -308,22 +155,22 @@ export function StatisticsPage() {
                 tick={{ fill: '#64748b', fontSize: 12 }}
                 allowDecimals={stats.chartUnit !== '秒'}
               />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
+              <Tooltip content={<StatTooltip chartUnit={stats.chartUnit} />} cursor={{ fill: '#f1f5f9' }} />
               <Legend
                 wrapperStyle={{ paddingTop: '12px' }}
                 iconType="rect"
               />
               <Bar
                 dataKey="study"
-                name="学习"
-                fill={STUDY_COLOR}
+                name={getActivityConfig(ActivityType.STUDY).label}
+                fill={getActivityConfig(ActivityType.STUDY).color.hex}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={30}
               />
               <Bar
                 dataKey="reading"
-                name="阅读"
-                fill={READING_COLOR}
+                name={getActivityConfig(ActivityType.READING).label}
+                fill={getActivityConfig(ActivityType.READING).color.hex}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={30}
               />

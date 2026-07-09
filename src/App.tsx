@@ -16,7 +16,7 @@ export default function App() {
   return (
     <>
       <Toaster position="top-center" richColors />
-      <Layout currentTab={currentTab} onTabChange={setCurrentTab}>
+      <Layout currentTab={currentTab} onTabChange={setCurrentTab} hideTypeSwitcher={currentTab === 'statistics'}>
         {currentTab === 'timer' && <TimerPage />}
         {currentTab === 'history' && <HistoryPage />}
         {currentTab === 'statistics' && <StatisticsPage />}

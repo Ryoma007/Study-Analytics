@@ -68,7 +68,7 @@ describe('TimerPage', () => {
   it('点击开始后 store.isTimerRunning 为 true', () => {
     renderTimerPage();
     // 找到 Play 图标的按钮（开始按钮）
-    const playBtn = document.querySelector('.lucide-play')?.closest('button') as HTMLButtonElement;
+    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
     fireEvent.click(playBtn!);
     const { isTimerRunning } = useActivityStore.getState();
     expect(isTimerRunning).toBe(true);
@@ -78,12 +78,12 @@ describe('TimerPage', () => {
   it('学习模式下保存的 session type 为 STUDY', () => {
     renderTimerPage();
     // 点击开始按钮
-    const playBtn = document.querySelector('.lucide-play')?.closest('button') as HTMLButtonElement;
+    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
     fireEvent.click(playBtn!);
     // 推进 1 秒
     act(() => { vi.advanceTimersByTime(1000); });
     // 点击停止按钮
-    const stopBtn = document.querySelector('.lucide-square')?.closest('button') as HTMLButtonElement;
+    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
     fireEvent.click(stopBtn!);
     const { sessions } = useActivityStore.getState();
     expect(sessions[0].type).toBe(ActivityType.STUDY);
@@ -92,10 +92,10 @@ describe('TimerPage', () => {
   it('阅读模式下保存的 session type 为 READING', () => {
     useActivityStore.getState().setCurrentType(ActivityType.READING);
     renderTimerPage();
-    const playBtn = document.querySelector('.lucide-play')?.closest('button') as HTMLButtonElement;
+    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
     fireEvent.click(playBtn!);
     act(() => { vi.advanceTimersByTime(1000); });
-    const stopBtn = document.querySelector('.lucide-square')?.closest('button') as HTMLButtonElement;
+    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
     fireEvent.click(stopBtn!);
     const { sessions } = useActivityStore.getState();
     expect(sessions[0].type).toBe(ActivityType.READING);
@@ -104,10 +104,10 @@ describe('TimerPage', () => {
   // === 默认内容 ===
   it('未填写内容时，学习模式默认保存"日常学习"', () => {
     renderTimerPage();
-    const playBtn = document.querySelector('.lucide-play')?.closest('button') as HTMLButtonElement;
+    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
     fireEvent.click(playBtn!);
     act(() => { vi.advanceTimersByTime(1000); });
-    const stopBtn = document.querySelector('.lucide-square')?.closest('button') as HTMLButtonElement;
+    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
     fireEvent.click(stopBtn!);
     const { sessions } = useActivityStore.getState();
     expect(sessions[0].content).toBe('日常学习');
@@ -116,10 +116,10 @@ describe('TimerPage', () => {
   it('未填写内容时，阅读模式默认保存"日常阅读"', () => {
     useActivityStore.getState().setCurrentType(ActivityType.READING);
     renderTimerPage();
-    const playBtn = document.querySelector('.lucide-play')?.closest('button') as HTMLButtonElement;
+    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
     fireEvent.click(playBtn!);
     act(() => { vi.advanceTimersByTime(1000); });
-    const stopBtn = document.querySelector('.lucide-square')?.closest('button') as HTMLButtonElement;
+    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
     fireEvent.click(stopBtn!);
     const { sessions } = useActivityStore.getState();
     expect(sessions[0].content).toBe('日常阅读');
@@ -128,25 +128,25 @@ describe('TimerPage', () => {
   // === 主题色按钮 ===
   it('学习模式下开始按钮为 indigo', () => {
     renderTimerPage();
-    const playBtn = document.querySelector('.lucide-play')?.closest('button') as HTMLButtonElement;
+    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
     expect(playBtn.className).toContain('bg-indigo');
   });
 
   it('阅读模式下开始按钮为 emerald', () => {
     useActivityStore.getState().setCurrentType(ActivityType.READING);
     renderTimerPage();
-    const playBtn = document.querySelector('.lucide-play')?.closest('button') as HTMLButtonElement;
+    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
     expect(playBtn.className).toContain('bg-emerald');
   });
 
   // === 停止后 isTimerRunning 恢复为 false ===
   it('点击停止后 store.isTimerRunning 为 false', () => {
     renderTimerPage();
-    const playBtn = document.querySelector('.lucide-play')?.closest('button') as HTMLButtonElement;
+    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
     fireEvent.click(playBtn!);
     // 推进时间，让停止按钮可用
     act(() => { vi.advanceTimersByTime(2000); });
-    const stopBtn = document.querySelector('.lucide-square')?.closest('button') as HTMLButtonElement;
+    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
     fireEvent.click(stopBtn!);
     const { isTimerRunning } = useActivityStore.getState();
     expect(isTimerRunning).toBe(false);

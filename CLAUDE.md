@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 图标 | lucide-react |
 | 动画 | motion (Framer Motion) |
 | Toast | sonner |
-| 枚举 | enumify 2 |
+| 枚举 | const 对象 + 字符串联合类型 |
 | 测试 | vitest 4 + @testing-library/react + jsdom |
 | AI | @google/genai (Gemini API) |
 
@@ -58,18 +58,30 @@ pnpm clean
 │   ├── App.tsx               # 根组件，管理 tab 切换状态（timer/history/statistics）
 │   ├── store.ts              # Zustand store，含 ActivitySession 数据模型和 CRUD
 │   ├── enums/
-│   │   ├── ActivityType.ts   # 活动类型枚举（STUDY/READING）
+│   │   ├── ActivityType.ts   # 活动类型常量 + 联合类型（STUDY/READING，已移除 Enumify）
 │   │   └── index.ts          # 枚举统一导出
+│   ├── config/
+│   │   └── activityConfig.ts # 活动类型 → 展示属性映射表（颜色、文案），getActivityConfig()
+│   ├── hooks/
+│   │   ├── useTimer.ts       # 计时器状态机 hook（依赖注入模式）
+│   │   └── useStatistics.ts  # 统计数据管道 hook（接受 sessions 参数）
+│   ├── utils/
+│   │   └── time.ts           # 时间格式化工具：formatTime / formatDuration / formatTimeValue
 │   ├── test/
 │   │   ├── setup.ts          # vitest 初始化（@testing-library/jest-dom）
 │   │   ├── __mocks__/idb-keyval.ts  # idb-keyval mock（jsdom 无 IndexedDB）
 │   │   └── *.test.{ts,tsx}   # 测试文件
 │   ├── components/
-│   │   └── Layout.tsx        # 侧边栏布局（3 个 tab + 学习/阅读分段按钮）
+│   │   ├── Layout.tsx        # 侧边栏布局（hideTypeSwitcher prop 解除对 StatisticsPage 的感知）
+│   │   ├── StatTooltip.tsx   # 统计图表自定义 Tooltip（chartUnit 通过 props 传入）
+│   │   └── HistoryPage/
+│   │       ├── SessionTable.tsx       # 历史记录表格（空状态、全选、行渲染）
+│   │       ├── SessionFormModal.tsx   # 添加/编辑记录弹窗
+│   │       └── DeleteConfirmDialog.tsx # 删除确认弹窗
 │   ├── pages/
-│   │   ├── TimerPage.tsx     # 计时器（开始/暂停/停止，支持学习/阅读文案）
-│   │   ├── HistoryPage.tsx   # 历史记录列表（按类型过滤、CRUD、批量删除）
-│   │   └── StatisticsPage.tsx # 统计图表（双类型合并分组柱状图、拆分卡片、7/14/30天/年度）
+│   │   ├── TimerPage.tsx     # 计时器 UI 薄层（逻辑在 useTimer hook 中，按钮有 data-testid）
+│   │   ├── HistoryPage.tsx   # 历史记录编排层（逻辑在子组件中）
+│   │   └── StatisticsPage.tsx # 统计图表编排层（数据管道在 useStatistics hook 中）
 │   └── index.css             # Tailwind 入口（@import "tailwindcss"）
 ├── server.ts / server.js     # Express 后端（如有）
 ├── docs/
@@ -89,7 +101,7 @@ pnpm clean
 
 `store.ts` 中 `useActivityStore` 使用 Zustand 的 `persist` 中间件，自定义 `idbStorage` engine 基于 `idb-keyval`。同时包含从 localStorage 和旧 key `study_sessions_storage` 迁移的逻辑。`currentType` 切换受 `isTimerRunning` 守卫保护（计时器运行中禁止切换）。
 
-**关键陷阱：自定义 `StateStorage.getItem` 返回值会经过双重 JSON 解析。** `getItem` 返回字符串 → `createJSONStorage` 内部 `JSON.parse` → Zustand merge。在 `getItem` 中做 enum 反序列化再 `JSON.stringify` 是无效的（实例再次变成普通对象）。**Enumify 实例恢复必须在 persist 的 `merge` 函数中完成**，`merge` 是水化最后一步，此时已是 JS 对象。本项目的 `activityMerge`（`src/store.ts`）已处理此事。
+**关键陷阱：自定义 `StateStorage.getItem` 返回值会经过双重 JSON 解析。** `getItem` 返回字符串 → `createJSONStorage` 内部 `JSON.parse` → Zustand merge。类型恢复逻辑应在 `activityMerge` 中处理（水化最后一步）。当前 `activityMerge` 兼容旧版 Enumify `{enumKey:"X"}` 格式，自动迁移为纯字符串。
 
 ### 计时器精度：基于系统时钟
 
@@ -109,19 +121,39 @@ interface ActivitySession {
 }
 ```
 
-### enumify v2 注意事项
+### ActivityType 常量模式（已移除 Enumify）
 
-- `.name` 返回 `undefined`，使用 `.enumKey` 获取枚举名（如 `"STUDY"`）
-- `.toString()` 返回 `"ClassName.VALUE"`（如 `"ActivityType.STUDY"`）
-- 序列化后恢复：`ActivityType.enumValueOf(obj.enumKey)`
-- 比较枚举值：使用 `===` 直接比较实例，不要用字符串比较
-- `enumValueOf` 对无效 key 返回 `undefined`（不抛异常），容错需 `enumValueOf(key) || fallback`，单靠 try/catch 不够
+- `ActivityType` 是 `const { STUDY: 'STUDY', READING: 'READING' } as const` + 联合类型
+- `ACTIVITY_TYPES` 数组替代原 `ActivityType.enumValues`（遍历所有类型用）
+- `activityTypeFromValue(str)` 替代原 `ActivityType.enumValueOf(str)` —— **无效值抛异常，不兜底**
+- `type` 字段现在是纯字符串，JSON 序列化后直接可用，无需反序列化逻辑
+- store 的 `activityMerge` 兼容旧版 `{enumKey: "X"}` 格式，自动迁移为纯字符串
+
+### 配置表模式（activityConfig）
+
+- `src/config/activityConfig.ts` 是活动类型 → 展示属性的**单一事实源**
+- `getActivityConfig(type)` 返回 `{ label, color: { hex, tailwind: {...} }, copy: {...} }`
+- 新增活动类型只需改 2 个文件：`ActivityType.ts`（加一行） + `activityConfig.ts`（加一条记录）
+- 所有组件通过查表获取颜色/文案，不存在 if/else 三元表达式
+
+### Hooks 依赖注入模式
+
+- `useTimer({ currentType, addSession, setIsTimerRunning })` —— 接受 store deps 作为参数
+- `useStatistics(sessions)` —— 接受 sessions 数组作为参数
+- hooks 本身与 store 解耦，测试时可传入 mock 数据
+
+### Layout 接口
+
+- `Layout` 新增 `hideTypeSwitcher?: boolean` prop，由 App.tsx 传入 `currentTab === 'statistics'`
+- Layout 不再持有页面特定知识（不再检查 `currentTab` 值）
 
 ### 测试约定
 
 - jsdom 不支持 IndexedDB，测试 store 时必须 `vi.mock('idb-keyval')`，mock 实现在 `src/test/__mocks__/idb-keyval.ts`
 - recharts 的 `ResponsiveContainer` 在 jsdom 中无法正常渲染，需 mock 为直接透传 children
 - Tailwind 动态 class：避免用 `{ [key]: value }` lookup 表拼接 class 字符串，改用条件分支返回完整 class 字符串，确保 Tailwind v4 能扫描到
+- **计时器按钮**使用 `data-testid="timer-start"` / `data-testid="timer-stop"` 定位，不要用 `.lucide-play` 等 CSS class 选择器
+- **Hooks 测试**使用 `renderHook` from `@testing-library/react`；`useTimer` 需传入 store deps 参数
 - 当前测试全部通过 `setState` 直接设值，绕过了 persist 水化过程。涉及 persist 恢复逻辑的修改需单独测试 `activityMerge` 函数（已导出），或通过 mock IndexedDB 写入数据后触发 `persist.rehydrate()` 做端到端验证
   - 测试辅助函数中创建 session 应使用 `new Date()` 而非硬编码日期（如 `new Date('2026-07-01')`）。组件内部 `startOfDay(new Date())` 依赖系统时钟，硬编码日期会随时间推移超出默认范围（如 7 天），导致数据被过滤、测试静默返回 0
   - 统计页拆分卡片后，"学习"/"阅读"标签在多张卡片中重复出现，断言需使用 `getAllByText` + `.length` 而非 `getByText`
