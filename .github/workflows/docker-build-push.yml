@@ -9,7 +9,7 @@ on:
 
 # 环境变量
 env:
-  DOCKER_IMAGE: ryoma007/study-analytics
+  DOCKER_IMAGE: ryoma9426/study-analytics
 
 jobs:
   # 第一步：运行测试
