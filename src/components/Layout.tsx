@@ -55,35 +55,37 @@ export function Layout({ children, currentTab, onTabChange }: LayoutProps) {
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">时间记录</h1>
         </div>
 
-        {/* 活动类型切换（分段按钮） */}
-        <div className="px-4 py-3 border-b border-slate-100">
-          <div className="flex rounded-lg bg-slate-100 p-1">
-            {/* 学习按钮 */}
-            <button
-              onClick={() => setCurrentType(ActivityType.STUDY)}
-              disabled={isTimerRunning}
-              className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                currentType === ActivityType.STUDY
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              } ${isTimerRunning ? 'cursor-not-allowed opacity-60' : ''}`}
-            >
-              学习
-            </button>
-            {/* 阅读按钮 */}
-            <button
-              onClick={() => setCurrentType(ActivityType.READING)}
-              disabled={isTimerRunning}
-              className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                currentType === ActivityType.READING
-                  ? 'bg-white text-slate-800 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              } ${isTimerRunning ? 'cursor-not-allowed opacity-60' : ''}`}
-            >
-              阅读
-            </button>
+        {/* 活动类型切换（分段按钮），统计页隐藏 */}
+        {currentTab !== 'statistics' && (
+          <div className="px-4 py-3 border-b border-slate-100">
+            <div className="flex rounded-lg bg-slate-100 p-1">
+              {/* 学习按钮 */}
+              <button
+                onClick={() => setCurrentType(ActivityType.STUDY)}
+                disabled={isTimerRunning}
+                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                  currentType === ActivityType.STUDY
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                } ${isTimerRunning ? 'cursor-not-allowed opacity-60' : ''}`}
+              >
+                学习
+              </button>
+              {/* 阅读按钮 */}
+              <button
+                onClick={() => setCurrentType(ActivityType.READING)}
+                disabled={isTimerRunning}
+                className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                  currentType === ActivityType.READING
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                } ${isTimerRunning ? 'cursor-not-allowed opacity-60' : ''}`}
+              >
+                阅读
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 导航 tab */}
         <nav className="flex-1 p-4 space-y-1">

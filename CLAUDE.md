@@ -69,7 +69,7 @@ pnpm clean
 │   ├── pages/
 │   │   ├── TimerPage.tsx     # 计时器（开始/暂停/停止，支持学习/阅读文案）
 │   │   ├── HistoryPage.tsx   # 历史记录列表（按类型过滤、CRUD、批量删除）
-│   │   └── StatisticsPage.tsx # 统计图表（按类型过滤、7/14/30天/年度）
+│   │   └── StatisticsPage.tsx # 统计图表（双类型合并分组柱状图、拆分卡片、7/14/30天/年度）
 │   └── index.css             # Tailwind 入口（@import "tailwindcss"）
 ├── server.ts / server.js     # Express 后端（如有）
 ├── docs/
@@ -123,6 +123,8 @@ interface ActivitySession {
 - recharts 的 `ResponsiveContainer` 在 jsdom 中无法正常渲染，需 mock 为直接透传 children
 - Tailwind 动态 class：避免用 `{ [key]: value }` lookup 表拼接 class 字符串，改用条件分支返回完整 class 字符串，确保 Tailwind v4 能扫描到
 - 当前测试全部通过 `setState` 直接设值，绕过了 persist 水化过程。涉及 persist 恢复逻辑的修改需单独测试 `activityMerge` 函数（已导出），或通过 mock IndexedDB 写入数据后触发 `persist.rehydrate()` 做端到端验证
+  - 测试辅助函数中创建 session 应使用 `new Date()` 而非硬编码日期（如 `new Date('2026-07-01')`）。组件内部 `startOfDay(new Date())` 依赖系统时钟，硬编码日期会随时间推移超出默认范围（如 7 天），导致数据被过滤、测试静默返回 0
+  - 统计页拆分卡片后，"学习"/"阅读"标签在多张卡片中重复出现，断言需使用 `getAllByText` + `.length` 而非 `getByText`
 
 ### 图表单位自适应
 

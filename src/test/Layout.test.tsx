@@ -124,6 +124,32 @@ describe('Layout', () => {
     expect(onTabChange).toHaveBeenCalledWith('history');
   });
 
+  // === L1: 统计页隐藏类型切换 ===
+  it('数据统计页不渲染类型切换按钮', () => {
+    renderLayout('statistics');
+    expect(screen.queryByText('学习')).toBeNull();
+    expect(screen.queryByText('阅读')).toBeNull();
+  });
+
+  it('数据统计页仍渲染导航 tab', () => {
+    renderLayout('statistics');
+    expect(screen.getByText('计时器')).toBeInTheDocument();
+    expect(screen.getByText('历史记录')).toBeInTheDocument();
+    expect(screen.getByText('数据统计')).toBeInTheDocument();
+  });
+
+  it('计时器页仍渲染类型切换按钮', () => {
+    renderLayout('timer');
+    expect(screen.getByText('学习')).toBeInTheDocument();
+    expect(screen.getByText('阅读')).toBeInTheDocument();
+  });
+
+  it('历史记录页仍渲染类型切换按钮', () => {
+    renderLayout('history');
+    expect(screen.getByText('学习')).toBeInTheDocument();
+    expect(screen.getByText('阅读')).toBeInTheDocument();
+  });
+
   // === 子内容渲染 ===
   it('渲染 children', () => {
     renderLayout();
