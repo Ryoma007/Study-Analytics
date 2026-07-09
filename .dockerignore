@@ -1,0 +1,30 @@
+# 依赖目录
+node_modules/
+.pnpm-store/
+
+# 构建产物
+dist/
+
+# 版本控制
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# 测试
+coverage/
+*.test.ts
+*.test.tsx
+
+# 文档
+docs/
+*.md
+
+# CI/CD
+.github/
+
+# 环境变量
+.env
+.env.*
