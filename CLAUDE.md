@@ -217,7 +217,8 @@ CREATE TABLE active_session (
 
 - 零运行时依赖（无 node_modules），Docker runtime 不要复制 `packages/shared/node_modules`。
 - 生产构建需 `tsconfig.json` + `typescript` devDependency（`pnpm -r build` 时 `tsc` 在此包内运行）。
-- `main`/`exports` 指向 `dist/`（非 `src/`），否则 Node.js 无法直接运行 .ts 源码。
+- `main`/`types` 指向 `./src/index.ts`（vitest/vite 无需预构建即可解析）。
+- `exports` 用条件导出：`development` → `./src/index.ts`（vitest），`default` → `./dist/index.js`（Node.js 生产）。否则 CI 不构建 shared 直接跑 test 会报 `Failed to resolve entry for package "@study-analytics/shared"`。
 
 ### React 19 类型
 
