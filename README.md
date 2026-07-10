@@ -1,116 +1,139 @@
 # Study Analytics — 学习与阅读时间追踪
 
-纯前端活动时长追踪 SPA，支持**学习**和**阅读**两种活动类型的计时器、历史记录管理以及按类型过滤的数据统计图表。
+前后端分离的活动时长追踪应用，支持**学习**和**阅读**两种活动类型的计时、历史管理与数据统计。
+
+计时逻辑下沉后端（权威计算），前端通过心跳保活，解决"忘记关计时"与后台标签页 JS 节流问题。
 
 ## 功能特性
 
-- **双类型计时器** — 支持"学习"和"阅读"两种活动类型，计时器运行中自动锁定类型
-- **精确计时** — 基于系统时钟（`Date.now()`），避免 `setInterval` 累积误差；标签页隐藏/恢复时自动校准
-- **历史记录** — 按类型过滤、支持编辑/删除单条记录、批量删除，数据持久化至 IndexedDB
-- **统计图表** — 按日/周/月/年维度展示学习/阅读时长，图表单位自适应（秒/分钟/小时）
-- **离线可用** — 纯前端应用，无需后端，所有数据存储在浏览器 IndexedDB 中
+- **双类型计时器** — 学习/阅读两种活动类型，计时中锁定类型切换
+- **后端权威计时** — 计时在后端 SQLite，前端仅心跳 + 本地推算显示，防丢失
+- **历史记录** — 按类型过滤、手动添加/编辑/批量删除
+- **统计图表** — 日/周/月/年维度，学习+阅读双类型分组柱状图，单位自适应
+- **Docker 部署** — 单容器 Node 全包（API + 静态资源），SQLite 挂卷持久化
 
 ## 技术栈
 
-| 类别 | 技术 |
-|------|------|
-| 框架 | React 19 + TypeScript 5.8 |
-| 构建工具 | Vite 6 |
-| CSS | Tailwind CSS v4 |
-| 状态管理 | Zustand 5（persist 中间件 + IndexedDB 自定义 storage） |
-| 客户端存储 | IndexedDB（`idb-keyval`） |
+| 层 | 技术 |
+|---|------|
+| 前端 | React 19 + TypeScript 5.8 + Vite 6 + Tailwind CSS v4 |
+| 状态/数据 | Zustand 5（仅 currentType）+ TanStack Query 5（服务端缓存） |
+| 后端 | Express 4 + better-sqlite3（裸 SQL，无 ORM） |
+| 共享契约 | @study-analytics/shared（类型 + 常量，零运行时依赖） |
 | 图表 | recharts 3 |
-| 日期处理 | date-fns 4 |
+| 日期 | date-fns 4 |
 | 图标 | lucide-react |
-| 动画 | motion (Framer Motion) |
-| Toast | sonner |
-| 枚举 | enumify 2 |
-| 测试 | vitest 4 + @testing-library/react + jsdom |
+| 测试 | vitest 4 + @testing-library/react + supertest |
+| 部署 | Docker + docker-compose（单容器 node:22-alpine） |
 
 ## 快速开始
 
-**前置要求：** Node.js 18+、pnpm v8+
+**前置要求：** Node.js 22+、pnpm v9+
 
 ```bash
 # 安装依赖
 pnpm install
 
-# 启动开发服务器（端口 3001）
-pnpm dev
+# 启动后端（端口 3002）
+pnpm --filter backend dev
 
-# 构建生产版本
-pnpm build
+# 另开终端，启动前端（端口 3001，自动代理 /api → 3002）
+pnpm --filter frontend dev
 
-# 预览构建产物
-pnpm preview
+# 访问 http://localhost:3001
 ```
 
 ## 项目结构
 
 ```
-src/
-├── main.tsx                  # 入口，挂载 React 根节点
-├── App.tsx                   # 根组件，管理 tab 切换（timer/history/statistics）
-├── store.ts                  # Zustand store，ActivitySession 数据模型与 CRUD
-├── index.css                 # Tailwind 入口
-├── enums/
-│   ├── ActivityType.ts       # 活动类型枚举（STUDY / READING）
-│   └── index.ts              # 枚举统一导出
-├── components/
-│   └── Layout.tsx            # 侧边栏布局 + 学习/阅读分段按钮
-├── pages/
-│   ├── TimerPage.tsx         # 计时器页面
-│   ├── HistoryPage.tsx       # 历史记录页面
-│   └── StatisticsPage.tsx    # 统计图表页面
-└── test/
-    ├── setup.ts              # vitest 初始化
-    ├── __mocks__/idb-keyval.ts  # IndexedDB mock（jsdom 不支持 IndexedDB）
-    └── *.test.{ts,tsx}       # 测试文件
+├── apps/
+│   ├── frontend/          # React 19 SPA
+│   │   └── src/
+│   │       ├── api/           # TanStack Query hooks + fetch 封装
+│   │       ├── timer/         # 心跳模块（15s 心跳 + clockOffset 校准）
+│   │       ├── migration/     # 旧数据迁移（IndexedDB → 后端单向漏斗）
+│   │       ├── hooks/         # useTimer（心跳薄壳）/ useStatistics（取数据薄壳）
+│   │       ├── pages/         # TimerPage / HistoryPage / StatisticsPage
+│   │       └── components/    # Layout / SessionTable / SessionFormModal 等
+│   └── backend/           # Express + better-sqlite3
+│       └── src/
+│           ├── server.ts      # 入口（dev API / 生产全包静态托管）
+│           ├── routes.ts      # /api/* 路由 + 中间件
+│           ├── db.ts          # SQLite 连接 + schema migration
+│           └── services/      # timer / sessions / statistics 业务逻辑
+├── packages/
+│   └── shared/            # 前后端共享类型 + 常量（纯 TypeScript）
+├── data/                  # SQLite 数据库（dev 生成 + Docker 挂卷）
+├── Dockerfile             # node:22-alpine 多阶段构建
+├── docker-compose.yml     # 单服务 + 挂卷部署
+└── docs/adr/              # 架构决策记录（0001-0005）
 ```
 
 ## 可用命令
 
 | 命令 | 说明 |
 |------|------|
-| `pnpm dev` | 启动开发服务器（`localhost:3001`，绑定所有网卡） |
-| `pnpm build` | TypeScript 编译 + Vite 生产构建 |
-| `pnpm preview` | 本地预览生产构建 |
-| `pnpm lint` | TypeScript 类型检查（`tsc --noEmit`） |
-| `pnpm vitest` | 运行测试（监听模式） |
-| `pnpm vitest run` | 单次运行全部测试 |
-| `pnpm clean` | 清理构建输出目录 |
+| `pnpm dev` | 启动全部开发服务器 |
+| `pnpm -r build` | 构建所有包（shared → backend → frontend） |
+| `pnpm -r test` | 运行全部测试 |
+| `pnpm -r lint` | TypeScript 类型检查（全部包） |
+| `pnpm clean` | 清理所有构建输出 |
 
 ## 架构设计
 
-### 路由：状态驱动，无 React Router
+### 计时器：后端权威 + 前端心跳
 
-通过 `App.tsx` 中的 `currentTab` 状态切换页面，三个 tab：`timer`、`history`、`statistics`。
+- 计时逻辑在后端：时长 = 结算点 − `serverStartTime`，SQLite `active_session` 单行表为唯一事实源
+- 前端显示用 `elapsedMs = (Date.now() + clockOffset) − serverStartTime`，`clockOffset` 由心跳响应的 `serverTime` 校准
+- 停止入库的 `duration` 用后端返回值，非前端推算值
+- 前端：`setInterval(15s)` 心跳 + 回前台/网络恢复补发 + `sendBeacon` 卸载心跳
+- 已移除暂停/恢复（ADR-0001），运行中仅停止按钮
 
-### 数据持久化：Zustand + IndexedDB
+### 后端懒结算
 
-`useActivityStore` 使用 Zustand `persist` 中间件，通过 `idb-keyval` 自定义 storage engine 将状态写入 IndexedDB。同时兼容从 localStorage 及旧版本 key 迁移数据。
+超时判定不在后台跑定时器，而是在下次请求入口顺带检查 `last_heartbeat_at` 是否超 90s，超了先结算再处理请求。
 
-### 计时器精度
+### 数据库
 
-不使用 `setInterval` 累加，而是记录 `lastStartTime`，展示时间 = `accumulatedTime + (Date.now() - lastStartTime)`。监听 `visibilitychange` 事件，标签页恢复可见时立即校准。
+```sql
+-- 已完成记录
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY, type TEXT NOT NULL, date TEXT NOT NULL,
+  start_time INTEGER NOT NULL, end_time INTEGER NOT NULL,
+  duration INTEGER NOT NULL, content TEXT NOT NULL DEFAULT ''
+);
 
-### 数据模型
-
-```typescript
-interface ActivitySession {
-  id: string;          // crypto.randomUUID()
-  type: ActivityType;  // STUDY | READING
-  date: string;        // YYYY-MM-DD
-  startTime: number;   // epoch ms
-  endTime: number;     // epoch ms
-  duration: number;    // 秒
-  content: string;     // 活动内容描述
-}
+-- 运行中会话（始终最多一行）
+CREATE TABLE active_session (
+  id TEXT PRIMARY KEY, type TEXT NOT NULL,
+  start_time INTEGER NOT NULL, last_heartbeat_at INTEGER NOT NULL,
+  content TEXT NOT NULL DEFAULT ''
+);
 ```
 
-### 图表单位自适应
+### 数据访问
 
-统计图表根据数据最大值自动切换单位：≥ 3600 秒显示为小时，≥ 60 秒显示为分钟，否则显示为秒。
+better-sqlite3 同步 API + 裸 SQL prepared statements，无 ORM。统计聚合用 SQL `GROUP BY`。
+
+### Store 瘦身
+
+Zustand store 仅保留 `currentType` + `setCurrentType`，persist 到 localStorage。sessions 列表由 TanStack Query 管理，计时器状态由组件本地 state 管理。
+
+## Docker 部署
+
+```bash
+docker compose up -d --build
+# 访问 http://localhost:47291
+# API: curl localhost:47291/api/health
+```
+
+- 端口映射：`47291:3002`
+- SQLite 持久化：`./data:/app/data`
+- 环境变量：`SERVE_STATIC=1`、`DB_PATH=/app/data/study.db`
+
+## CI/CD
+
+GitHub Actions（`.github/workflows/docker-build-push.yml`）：push to main 触发测试 → 构建镜像 → 推送到 Docker Hub `ryoma9426/study-analytics:latest`。
 
 ## 许可证
 
