@@ -1,8 +1,6 @@
 import React from 'react';
-import { useActivityStore } from '../store';
-import { ActivityType, ACTIVITY_TYPES } from '../enums/ActivityType';
+import { ActivityType, ACTIVITY_TYPES } from '@study-analytics/shared';
 import { getActivityConfig } from '../config/activityConfig';
-import { type FormattedTime } from '../utils/time';
 import {
   BarChart,
   Bar,
@@ -16,10 +14,10 @@ import {
 import { Calendar, Clock, Target } from 'lucide-react';
 import { useStatistics } from '../hooks/useStatistics';
 import { StatTooltip } from '../components/StatTooltip';
+import type { FormattedTime } from '@study-analytics/shared';
 
 export function StatisticsPage() {
-  const sessions = useActivityStore((s) => s.sessions);
-  const { stats, rangeType, setRangeType } = useStatistics(sessions);
+  const { stats, rangeType, setRangeType, isLoading } = useStatistics();
 
   // 渲染单个统计卡片行（带颜色圆点）
   const renderStatRow = (label: string, time: FormattedTime, color: string) => (
@@ -69,6 +67,7 @@ export function StatisticsPage() {
             <button
               key={range}
               onClick={() => setRangeType(range)}
+              disabled={isLoading}
               className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 rangeType === range
                   ? 'bg-indigo-50 text-indigo-700'

@@ -1,7 +1,7 @@
 import React from 'react';
 import { BookOpen, Clock, History, BarChart2 } from 'lucide-react';
 import { useActivityStore } from '../store';
-import { ActivityType, ACTIVITY_TYPES } from '../enums/ActivityType';
+import { ACTIVITY_TYPES } from '@study-analytics/shared';
 import { getActivityConfig } from '../config/activityConfig';
 
 interface LayoutProps {
@@ -10,12 +10,12 @@ interface LayoutProps {
   onTabChange: (tab: string) => void;
   /** 是否隐藏活动类型切换器（统计页等不需要切换器的页面使用） */
   hideTypeSwitcher?: boolean;
+  /** 计时器是否正在运行（从 TimerPage 组件本地态传入，用于类型切换守卫） */
+  isTimerRunning?: boolean;
 }
 
-export function Layout({ children, currentTab, onTabChange, hideTypeSwitcher = false }: LayoutProps) {
-  // 从 store 读取当前类型和计时器状态
+export function Layout({ children, currentTab, onTabChange, hideTypeSwitcher = false, isTimerRunning = false }: LayoutProps) {
   const currentType = useActivityStore((s) => s.currentType);
-  const isTimerRunning = useActivityStore((s) => s.isTimerRunning);
   const setCurrentType = useActivityStore((s) => s.setCurrentType);
 
   const tabs = [

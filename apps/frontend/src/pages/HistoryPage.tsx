@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useActivityStore, type ActivitySession } from '../store';
+import { useActivityStore } from '../store';
 import { getActivityConfig } from '../config/activityConfig';
 import { format } from 'date-fns';
 import { Trash2, Plus } from 'lucide-react';
@@ -7,16 +7,19 @@ import { toast } from 'sonner';
 import { SessionTable } from '../components/HistoryPage/SessionTable';
 import { SessionFormModal, type SessionFormData } from '../components/HistoryPage/SessionFormModal';
 import { DeleteConfirmDialog } from '../components/HistoryPage/DeleteConfirmDialog';
+import { useSessions, useCreateSession, useUpdateSession, useDeleteSessions } from '../api/hooks';
+import type { ActivitySession } from '@study-analytics/shared';
 
 export function HistoryPage() {
-  const sessions = useActivityStore((s) => s.sessions);
   const currentType = useActivityStore((s) => s.currentType);
-  const deleteSessions = useActivityStore((s) => s.deleteSessions);
-  const addSession = useActivityStore((s) => s.addSession);
-  const updateSession = useActivityStore((s) => s.updateSession);
 
-  // 根据当前类型过滤
-  const filteredSessions = sessions.filter((s) => s.type === currentType);
+  // 通过 TanStack Query 获取后端数据
+  const { data: sessions = [] } = useSessions(currentType);
+
+  // 变更 hooks
+  const createMutation = useCreateSession();
+  const updateMutation = useUpdateSession();
+  const deleteMutation = useDeleteSessions();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,10 +41,10 @@ export function HistoryPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.length === filteredSessions.length) {
+    if (selectedIds.length === sessions.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(filteredSessions.map((s) => s.id));
+      setSelectedIds(sessions.map((s) => s.id));
     }
   };
 
@@ -50,11 +53,10 @@ export function HistoryPage() {
     setIsDeleteConfirmOpen(true);
   };
 
-  const confirmDelete = () => {
-    deleteSessions(selectedIds);
+  const confirmDelete = async () => {
+    await deleteMutation.mutateAsync(selectedIds);
     setSelectedIds([]);
     setIsDeleteConfirmOpen(false);
-    toast.success('记录已成功删除');
   };
 
   const handleAdd = () => {
@@ -82,7 +84,7 @@ export function HistoryPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const start = new Date(`${formData.date}T${formData.startTime}`).getTime();
     let end = new Date(`${formData.date}T${formData.endTime}`).getTime();
 
@@ -94,17 +96,20 @@ export function HistoryPage() {
     const duration = Math.floor((end - start) / 1000);
 
     if (editingSession) {
-      updateSession(editingSession.id, {
-        date: formData.date,
-        startTime: start,
-        endTime: end,
-        duration,
-        content: formData.content,
-        type: formData.type,
+      await updateMutation.mutateAsync({
+        id: editingSession.id,
+        data: {
+          date: formData.date,
+          startTime: start,
+          endTime: end,
+          duration,
+          content: formData.content,
+          type: formData.type,
+        },
       });
       toast.success('记录已更新');
     } else {
-      addSession({
+      await createMutation.mutateAsync({
         date: formData.date,
         startTime: start,
         endTime: end,
@@ -130,6 +135,7 @@ export function HistoryPage() {
           {selectedIds.length > 0 && (
             <button
               onClick={handleDelete}
+              disabled={deleteMutation.isPending}
               className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors font-medium text-sm"
             >
               <Trash2 className="w-4 h-4" />
@@ -148,7 +154,7 @@ export function HistoryPage() {
 
       {/* 表格 */}
       <SessionTable
-        sessions={filteredSessions}
+        sessions={sessions}
         selectedIds={selectedIds}
         emptyText={emptyText}
         onToggleSelect={toggleSelect}

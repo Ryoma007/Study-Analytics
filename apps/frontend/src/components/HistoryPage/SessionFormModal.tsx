@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityType, ACTIVITY_TYPES, activityTypeFromValue } from '../../enums/ActivityType';
 import { getActivityConfig } from '../../config/activityConfig';
-import type { ActivitySession } from '../../store';
+import type { ActivitySession } from '@study-analytics/shared';
 import { X } from 'lucide-react';
 
 /**

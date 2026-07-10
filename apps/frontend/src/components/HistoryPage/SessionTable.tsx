@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ActivitySession } from '../../store';
+import type { ActivitySession } from '@study-analytics/shared';
 import { format } from 'date-fns';
 import { formatDuration } from '../../utils/time';
 import { CheckSquare, Square, Edit2 } from 'lucide-react';

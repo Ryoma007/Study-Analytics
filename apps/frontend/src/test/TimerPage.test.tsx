@@ -1,26 +1,41 @@
-// TimerPage 行为测试：动态文案、类型保存、主题色、isTimerRunning 同步
-import { render, screen, fireEvent, act } from '@testing-library/react';
+// TimerPage 行为测试：动态文案、类型保存、主题色、isRunning 状态回调
+import { render, screen, fireEvent } from '@testing-library/react';
 import { TimerPage } from '../pages/TimerPage';
 import { useActivityStore } from '../store';
 import { ActivityType } from '../enums/ActivityType';
 import { clearMockStore } from './__mocks__/idb-keyval';
+
+// Mock useTimer hook
+const mockHandleStart = vi.fn();
+const mockHandleStop = vi.fn();
+let mockIsRunning = false;
+let mockDisplayTime = 0;
+
+vi.mock('../hooks/useTimer', () => ({
+  useTimer: () => ({
+    displayTime: mockDisplayTime,
+    isRunning: mockIsRunning,
+    content: '',
+    setContent: vi.fn(),
+    handleStart: mockHandleStart,
+    handleStop: mockHandleStop,
+  }),
+}));
 
 vi.mock('idb-keyval');
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 beforeEach(() => {
   clearMockStore();
-  useActivityStore.setState({ sessions: [], currentType: ActivityType.STUDY, isTimerRunning: false });
-  vi.useFakeTimers();
-  // 固定当前时间
-  vi.setSystemTime(new Date('2026-07-01T10:00:00'));
+  useActivityStore.setState({ currentType: ActivityType.STUDY });
+  mockIsRunning = false;
+  mockDisplayTime = 0;
+  mockHandleStart.mockClear();
+  mockHandleStop.mockClear();
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-const renderTimerPage = () => render(<TimerPage />);
+const renderTimerPage = (onRunningChange?: (running: boolean) => void) =>
+  render(<TimerPage onRunningChange={onRunningChange} />);
 
 describe('TimerPage', () => {
   // === 动态文案 ===
@@ -64,91 +79,59 @@ describe('TimerPage', () => {
     });
   });
 
-  // === 启动/停止同步 isTimerRunning ===
-  it('点击开始后 store.isTimerRunning 为 true', () => {
+  // === 停止状态：显示开始按钮 ===
+  it('未运行时显示开始按钮', () => {
     renderTimerPage();
-    // 找到 Play 图标的按钮（开始按钮）
-    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
-    fireEvent.click(playBtn!);
-    const { isTimerRunning } = useActivityStore.getState();
-    expect(isTimerRunning).toBe(true);
+    expect(screen.getByTestId('timer-start')).toBeInTheDocument();
   });
 
-  // === 保存时记录包含正确 type ===
-  it('学习模式下保存的 session type 为 STUDY', () => {
+  it('点击开始按钮调用 handleStart', () => {
     renderTimerPage();
-    // 点击开始按钮
-    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
-    fireEvent.click(playBtn!);
-    // 推进 1 秒
-    act(() => { vi.advanceTimersByTime(1000); });
-    // 点击停止按钮
-    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
-    fireEvent.click(stopBtn!);
-    const { sessions } = useActivityStore.getState();
-    expect(sessions[0].type).toBe(ActivityType.STUDY);
+    fireEvent.click(screen.getByTestId('timer-start'));
+    expect(mockHandleStart).toHaveBeenCalledTimes(1);
   });
 
-  it('阅读模式下保存的 session type 为 READING', () => {
-    useActivityStore.getState().setCurrentType(ActivityType.READING);
+  // === 运行状态：显示停止按钮，无暂停按钮 ===
+  it('运行时显示停止按钮', () => {
+    mockIsRunning = true;
     renderTimerPage();
-    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
-    fireEvent.click(playBtn!);
-    act(() => { vi.advanceTimersByTime(1000); });
-    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
-    fireEvent.click(stopBtn!);
-    const { sessions } = useActivityStore.getState();
-    expect(sessions[0].type).toBe(ActivityType.READING);
+    expect(screen.getByTestId('timer-stop')).toBeInTheDocument();
   });
 
-  // === 默认内容 ===
-  it('未填写内容时，学习模式默认保存"日常学习"', () => {
+  it('运行时无暂停按钮（ADR-0001）', () => {
+    mockIsRunning = true;
     renderTimerPage();
-    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
-    fireEvent.click(playBtn!);
-    act(() => { vi.advanceTimersByTime(1000); });
-    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
-    fireEvent.click(stopBtn!);
-    const { sessions } = useActivityStore.getState();
-    expect(sessions[0].content).toBe('日常学习');
+    // 整个页面应该只有 2 个按钮：停止 +（开始按钮不应出现）
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.length).toBe(1); // 仅停止按钮
   });
 
-  it('未填写内容时，阅读模式默认保存"日常阅读"', () => {
-    useActivityStore.getState().setCurrentType(ActivityType.READING);
+  it('点击停止按钮调用 handleStop', () => {
+    mockIsRunning = true;
     renderTimerPage();
-    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
-    fireEvent.click(playBtn!);
-    act(() => { vi.advanceTimersByTime(1000); });
-    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
-    fireEvent.click(stopBtn!);
-    const { sessions } = useActivityStore.getState();
-    expect(sessions[0].content).toBe('日常阅读');
+    fireEvent.click(screen.getByTestId('timer-stop'));
+    expect(mockHandleStop).toHaveBeenCalledTimes(1);
+  });
+
+  // === onRunningChange 回调 ===
+  it('isRunning 变化时通知父组件', () => {
+    const onRunningChange = vi.fn();
+    mockIsRunning = true;
+    renderTimerPage(onRunningChange);
+    expect(onRunningChange).toHaveBeenCalledWith(true);
   });
 
   // === 主题色按钮 ===
   it('学习模式下开始按钮为 indigo', () => {
     renderTimerPage();
-    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
-    expect(playBtn.className).toContain('bg-indigo');
+    const btn = screen.getByTestId('timer-start');
+    expect(btn.className).toContain('bg-indigo');
   });
 
   it('阅读模式下开始按钮为 emerald', () => {
     useActivityStore.getState().setCurrentType(ActivityType.READING);
     renderTimerPage();
-    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
-    expect(playBtn.className).toContain('bg-emerald');
-  });
-
-  // === 停止后 isTimerRunning 恢复为 false ===
-  it('点击停止后 store.isTimerRunning 为 false', () => {
-    renderTimerPage();
-    const playBtn = screen.getByTestId('timer-start') as HTMLButtonElement;
-    fireEvent.click(playBtn!);
-    // 推进时间，让停止按钮可用
-    act(() => { vi.advanceTimersByTime(2000); });
-    const stopBtn = screen.getByTestId('timer-stop') as HTMLButtonElement;
-    fireEvent.click(stopBtn!);
-    const { isTimerRunning } = useActivityStore.getState();
-    expect(isTimerRunning).toBe(false);
+    const btn = screen.getByTestId('timer-start');
+    expect(btn.className).toContain('bg-emerald');
   });
 });

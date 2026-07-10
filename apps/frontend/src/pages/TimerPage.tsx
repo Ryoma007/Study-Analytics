@@ -1,17 +1,24 @@
 import React from 'react';
-import { Play, Pause, Square } from 'lucide-react';
+import { Play, Square } from 'lucide-react';
 import { useActivityStore } from '../store';
 import { getActivityConfig } from '../config/activityConfig';
 import { formatTime } from '../utils/time';
 import { useTimer } from '../hooks/useTimer';
 
-export function TimerPage() {
+interface TimerPageProps {
+  /** 计时器运行状态变化回调（用于类型切换守卫） */
+  onRunningChange?: (running: boolean) => void;
+}
+
+export function TimerPage({ onRunningChange }: TimerPageProps) {
   const currentType = useActivityStore((s) => s.currentType);
-  const addSession = useActivityStore((s) => s.addSession);
-  const setIsTimerRunning = useActivityStore((s) => s.setIsTimerRunning);
   const cfg = getActivityConfig(currentType);
-  const { displayTime, isRunning, content, setContent, handleStart, handlePause, handleStop } =
-    useTimer({ currentType, addSession, setIsTimerRunning });
+  const { displayTime, isRunning, content, setContent, handleStart, handleStop } = useTimer(currentType);
+
+  // 通知父组件运行状态变化
+  React.useEffect(() => {
+    onRunningChange?.(isRunning);
+  }, [isRunning, onRunningChange]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] space-y-12">
@@ -33,25 +40,13 @@ export function TimerPage() {
           </button>
         ) : (
           <button
-            onClick={handlePause}
-            className="w-20 h-20 flex items-center justify-center rounded-full bg-amber-500 text-white shadow-lg shadow-amber-200 hover:bg-amber-600 hover:scale-105 transition-all duration-200"
+            onClick={handleStop}
+            data-testid="timer-stop"
+            className="w-20 h-20 flex items-center justify-center rounded-full bg-rose-500 text-white shadow-lg shadow-rose-200 hover:bg-rose-600 hover:scale-105 transition-all duration-200"
           >
-            <Pause className="w-8 h-8" />
+            <Square className="w-8 h-8" />
           </button>
         )}
-
-        <button
-          onClick={handleStop}
-          disabled={displayTime === 0}
-          data-testid="timer-stop"
-          className={`w-20 h-20 flex items-center justify-center rounded-full shadow-lg transition-all duration-200 ${
-            displayTime === 0
-              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-              : 'bg-rose-500 text-white shadow-rose-200 hover:bg-rose-600 hover:scale-105'
-          }`}
-        >
-          <Square className="w-8 h-8" />
-        </button>
       </div>
 
       <div className="w-full max-w-md space-y-3">

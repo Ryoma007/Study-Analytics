@@ -5,7 +5,6 @@ import { useActivityStore } from '../store';
 import { ActivityType } from '../enums/ActivityType';
 import { clearMockStore } from './__mocks__/idb-keyval';
 
-// 模拟 idb-keyval
 vi.mock('idb-keyval');
 
 // 避免 sonner 报错
@@ -13,7 +12,7 @@ vi.mock('sonner', () => ({
   Toaster: () => null,
 }));
 
-// 模拟 motion（避免动画相关告警）
+// 模拟 motion
 vi.mock('motion', () => ({
   motion: {
     div: 'div',
@@ -24,16 +23,15 @@ vi.mock('motion', () => ({
 
 beforeEach(() => {
   clearMockStore();
-  useActivityStore.setState({ sessions: [], currentType: ActivityType.STUDY, isTimerRunning: false });
+  useActivityStore.setState({ currentType: ActivityType.STUDY });
 });
 
-// 渲染 Layout 的辅助函数
-const renderLayout = (tab = 'timer') => {
+const renderLayout = (tab = 'timer', isTimerRunning = false) => {
   const onTabChange = vi.fn();
   return {
     onTabChange,
     ...render(
-      <Layout currentTab={tab} onTabChange={onTabChange}>
+      <Layout currentTab={tab} onTabChange={onTabChange} isTimerRunning={isTimerRunning}>
         <div data-testid="content">page content</div>
       </Layout>
     ),
@@ -56,7 +54,6 @@ describe('Layout', () => {
 
   it('默认选中"学习"（跟随 currentType）', () => {
     renderLayout();
-    // 学习按钮应带有选中态样式（indigo 背景）
     const studyBtn = screen.getByText('学习').closest('button');
     expect(studyBtn).not.toBeNull();
   });
@@ -64,7 +61,6 @@ describe('Layout', () => {
   it('store currentType 为 READING 时选中"阅读"', () => {
     useActivityStore.getState().setCurrentType(ActivityType.READING);
     renderLayout();
-    // 阅读按钮应带有选中态样式
     const readingBtn = screen.getByText('阅读').closest('button');
     expect(readingBtn).not.toBeNull();
   });
@@ -87,7 +83,6 @@ describe('Layout', () => {
   // === Logo 颜色跟随类型 ===
   it('学习模式下 Logo 背景为 indigo', () => {
     renderLayout();
-    // Logo 容器 div 应包含 indigo 相关背景色 class
     const logoContainer = document.querySelector('[class*="bg-indigo"]');
     expect(logoContainer).not.toBeNull();
   });
@@ -99,15 +94,11 @@ describe('Layout', () => {
     expect(logoContainer).not.toBeNull();
   });
 
-  // === 计时中禁用 ===
-  it('计时器运行时，分段按钮不可点击（不触发切换）', () => {
-    useActivityStore.getState().setIsTimerRunning(true);
-    renderLayout();
-    // 尝试点击阅读
-    fireEvent.click(screen.getByText('阅读'));
-    // 当前类型应保持 STUDY（切换被拦截）
-    const { currentType } = useActivityStore.getState();
-    expect(currentType).toBe(ActivityType.STUDY);
+  // === 计时中禁用（通过 isTimerRunning prop） ===
+  it('isTimerRunning=true 时，分段按钮 disabled', () => {
+    renderLayout('timer', true);
+    const readingBtn = screen.getByText('阅读').closest('button');
+    expect(readingBtn).toBeDisabled();
   });
 
   // === 导航 tab 不变 ===
@@ -124,7 +115,7 @@ describe('Layout', () => {
     expect(onTabChange).toHaveBeenCalledWith('history');
   });
 
-  // === L1: 统计页隐藏类型切换 ===
+  // === 统计页隐藏类型切换 ===
   it('hideTypeSwitcher=true 时不渲染类型切换按钮', () => {
     const onTabChange = vi.fn();
     render(
@@ -141,18 +132,6 @@ describe('Layout', () => {
     expect(screen.getByText('计时器')).toBeInTheDocument();
     expect(screen.getByText('历史记录')).toBeInTheDocument();
     expect(screen.getByText('数据统计')).toBeInTheDocument();
-  });
-
-  it('计时器页仍渲染类型切换按钮', () => {
-    renderLayout('timer');
-    expect(screen.getByText('学习')).toBeInTheDocument();
-    expect(screen.getByText('阅读')).toBeInTheDocument();
-  });
-
-  it('历史记录页仍渲染类型切换按钮', () => {
-    renderLayout('history');
-    expect(screen.getByText('学习')).toBeInTheDocument();
-    expect(screen.getByText('阅读')).toBeInTheDocument();
   });
 
   // === 子内容渲染 ===

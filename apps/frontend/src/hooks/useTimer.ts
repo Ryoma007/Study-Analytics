@@ -1,124 +1,141 @@
-import React, { useState, useEffect } from 'react';
-import type { ActivitySession } from '../store';
-import { ActivityType } from '../enums/ActivityType';
-import { getActivityConfig } from '../config/activityConfig';
-import { format } from 'date-fns';
+/**
+ * useTimer —— 计时器心跳薄壳
+ *
+ * 阶段3 重写：本地计时逻辑全部移除，改为调后端接口 + 心跳 + 显示推算。
+ * 后端是计时权威源，前端仅通过 serverStartTime + clockOffset 推算显示值。
+ */
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { ActivityType } from '@study-analytics/shared';
+import { useStartSession, useStopSession } from '../api/hooks';
+import { startHeartbeat, type HeartbeatHandle } from '../timer/heartbeat';
 import { toast } from 'sonner';
 
-/** useTimer hook 依赖注入参数 */
-export interface UseTimerDeps {
-  /** 当前活动类型 */
-  currentType: ActivityType;
-  /** 添加 session 回调 */
-  addSession: (session: Omit<ActivitySession, 'id'>) => void;
-  /** 设置计时器运行状态回调 */
-  setIsTimerRunning: (running: boolean) => void;
-}
-
-/** useTimer hook 返回值接口 */
+/** useTimer 返回值接口 */
 export interface UseTimerReturn {
+  /** 当前推算的计时显示（秒） */
   displayTime: number;
+  /** 计时器是否正在运行 */
   isRunning: boolean;
+  /** 活动内容 */
   content: string;
+  /** 更新活动内容 */
   setContent: React.Dispatch<React.SetStateAction<string>>;
+  /** 开始计时 */
   handleStart: () => void;
-  handlePause: () => void;
+  /** 停止计时 */
   handleStop: () => void;
 }
 
 /**
- * 计时器状态机 hook
- * 通过参数注入依赖，不直接访问 store，便于测试
+ * 计时器心跳薄壳 hook
+ * @param currentType 当前活动类型
  */
-export function useTimer({ currentType, addSession, setIsTimerRunning }: UseTimerDeps): UseTimerReturn {
+export function useTimer(currentType: ActivityType): UseTimerReturn {
   const [isRunning, setIsRunning] = useState(false);
-  const [accumulatedTime, setAccumulatedTime] = useState(0); // 秒
-  const [lastStartTime, setLastStartTime] = useState<number | null>(null);
   const [displayTime, setDisplayTime] = useState(0); // 秒
   const [content, setContent] = useState('');
-  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
 
-  // 定时更新 displayTime + 页面可见性校准
-  useEffect(() => {
-    let interval: number;
-    if (isRunning && lastStartTime) {
-      interval = window.setInterval(() => {
-        const currentSegment = Math.floor((Date.now() - lastStartTime) / 1000);
-        setDisplayTime(accumulatedTime + currentSegment);
-      }, 1000);
-    } else {
-      setDisplayTime(accumulatedTime);
+  // 后端权威值
+  const serverStartTimeRef = useRef<number>(0);
+  const clockOffsetRef = useRef<number>(0);
+  const sessionIdRef = useRef<string | null>(null);
+  const heartbeatRef = useRef<HeartbeatHandle | null>(null);
+
+  // 显示刷新定时器
+  const displayIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // TanStack Query mutations
+  const startMutation = useStartSession();
+  const stopMutation = useStopSession();
+
+  /** 停止显示刷新和心跳 */
+  const cleanup = useCallback(() => {
+    if (displayIntervalRef.current !== null) {
+      clearInterval(displayIntervalRef.current);
+      displayIntervalRef.current = null;
     }
+    if (heartbeatRef.current) {
+      heartbeatRef.current.stop();
+      heartbeatRef.current = null;
+    }
+  }, []);
 
-    // 标签页恢复可见时立即校准显示时间
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isRunning && lastStartTime) {
-        const currentSegment = Math.floor((Date.now() - lastStartTime) / 1000);
-        setDisplayTime(accumulatedTime + currentSegment);
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isRunning, lastStartTime, accumulatedTime]);
+  // 组件卸载时清理
+  useEffect(() => {
+    return cleanup;
+  }, [cleanup]);
 
   /** 开始计时 */
-  const handleStart = () => {
-    const now = Date.now();
-    if (!sessionStartTime) {
-      setSessionStartTime(now);
-    }
-    setLastStartTime(now);
-    setIsRunning(true);
-    setIsTimerRunning(true);
-  };
-
-  /** 暂停计时 */
-  const handlePause = () => {
-    if (lastStartTime) {
-      const currentSegment = Math.floor((Date.now() - lastStartTime) / 1000);
-      setAccumulatedTime((prev) => prev + currentSegment);
-    }
-    setLastStartTime(null);
-    setIsRunning(false);
-  };
-
-  /** 停止并保存 */
-  const handleStop = () => {
-    setIsRunning(false);
-
-    let finalDuration = accumulatedTime;
-    if (lastStartTime) {
-      finalDuration += Math.floor((Date.now() - lastStartTime) / 1000);
-    }
-
-    if (finalDuration > 0) {
-      const cfg = getActivityConfig(currentType);
-      const now = Date.now();
-      addSession({
+  const handleStart = useCallback(async () => {
+    try {
+      const clientStartTime = Date.now();
+      const result = await startMutation.mutateAsync({
         type: currentType,
-        date: format(now, 'yyyy-MM-dd'),
-        startTime: sessionStartTime || now - finalDuration * 1000,
-        endTime: now,
-        duration: finalDuration,
-        content: content.trim() || cfg.copy.defaultContent,
+        content: content.trim() || undefined,
+        clientStartTime,
       });
 
-      // 重置状态
-      setAccumulatedTime(0);
-      setDisplayTime(0);
-      setContent('');
-      setSessionStartTime(null);
-      setLastStartTime(null);
-      setIsTimerRunning(false);
-      toast.success('记录保存成功！');
-    } else {
-      setIsTimerRunning(false);
+      // 记录后端权威值
+      sessionIdRef.current = result.sessionId;
+      serverStartTimeRef.current = result.serverStartTime;
+      clockOffsetRef.current = result.serverTime - clientStartTime;
+
+      // 启动心跳
+      heartbeatRef.current = startHeartbeat(result.sessionId, {
+        onSettled: (reason) => {
+          // 会话已结算，停止本地显示
+          cleanup();
+          setIsRunning(false);
+          setDisplayTime(0);
+          if (reason === 'preempted') {
+            toast.error('计时已在其他设备上被接管');
+          } else {
+            toast.info('计时已超时自动结算');
+          }
+        },
+        onClockOffsetUpdate: (offset) => {
+          clockOffsetRef.current = offset;
+        },
+        onConnectionLost: () => {
+          toast.warning('网络连接丢失，正在重试…');
+        },
+      });
+
+      // 启动显示刷新（每秒推算 elapsed）
+      displayIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor(
+          (Date.now() + clockOffsetRef.current - serverStartTimeRef.current) / 1000
+        );
+        setDisplayTime(Math.max(0, elapsed));
+      }, 1000);
+
+      setIsRunning(true);
+    } catch {
+      // 错误已由 mutation 的 apiWithToast 处理
     }
-  };
+  }, [currentType, content, startMutation, cleanup]);
+
+  /** 停止计时 */
+  const handleStop = useCallback(async () => {
+    if (!sessionIdRef.current) return;
+
+    try {
+      const result = await stopMutation.mutateAsync({
+        id: sessionIdRef.current,
+        content: content.trim() || undefined,
+      });
+
+      // 用后端返回的权威 duration
+      setDisplayTime(result.duration);
+
+      // 清理
+      cleanup();
+      setIsRunning(false);
+      sessionIdRef.current = null;
+    } catch {
+      // 错误已处理
+    }
+  }, [content, stopMutation, cleanup]);
 
   return {
     displayTime,
@@ -126,7 +143,6 @@ export function useTimer({ currentType, addSession, setIsTimerRunning }: UseTime
     content,
     setContent,
     handleStart,
-    handlePause,
     handleStop,
   };
 }
