@@ -207,6 +207,37 @@ CREATE TABLE active_session (
 
 前端首次连后端时自动把本地 IndexedDB 的 sessions 上传，后端按 `id` 去重（`INSERT OR IGNORE`）。**仅在后端确认合并成功计数后才清空本地**；上传失败保留本地下次重试。每台设备各走一遍"本地→后端"单向漏斗。
 
+### ESM 导入必须带 .js 扩展名
+
+- 后端（`"module": "ESNext"`）和 shared 包所有相对导入必须写 `.js` 后缀（如 `from './db.js'`）。
+- TypeScript 编译时 `.js` → `.ts`，不影响类型检查；但 Node.js ESM 运行时需要完整扩展名。
+- 检查遗漏：`grep -rn "from '\\.\\." apps/backend/src packages/shared/src | grep -v '\\.js'`。
+
+### shared 包（@study-analytics/shared）构建
+
+- 零运行时依赖（无 node_modules），Docker runtime 不要复制 `packages/shared/node_modules`。
+- 生产构建需 `tsconfig.json` + `typescript` devDependency（`pnpm -r build` 时 `tsc` 在此包内运行）。
+- `main`/`exports` 指向 `dist/`（非 `src/`），否则 Node.js 无法直接运行 .ts 源码。
+
+### React 19 类型
+
+React 19 不自带类型声明文件，必须安装 `@types/react` `@types/react-dom` 作为 devDependencies。
+
+### vite.config.ts 与 vitest
+
+- `test` 属性不被 Vite 的 `UserConfig` 类型识别。需在文件顶加 `/// <reference types="vitest/config" />` 指令或用函数式 `defineConfig(() => ({ ... }))`。
+- `loadEnv` / `process.env.GEMINI_API_KEY` 相关代码已删除（@google/genai 已移除）。
+
+### Docker 构建要点
+
+- **better-sqlite3 是 native addon**：builder 需 `apk add python3 make g++` 编译。
+- builder 和 runtime 必须用同一 `node:22-alpine` 版本，避免 native 模块二进制不兼容。
+- `SERVE_STATIC=1` 开启 Express 托管前端 dist + SPA 回退 + 缓存头。
+
+### 前端 isTimerRunning 数据流
+
+计时器运行状态不存 store。流向：`useTimer.isRunning` → `TimerPage.onRunningChange` 回调 → `App.tsx` state → `Layout.isTimerRunning` prop → 类型切换守卫 `disabled`。
+
 ## CI/CD
 
 - GitHub Actions 工作流 `.github/workflows/docker-build-push.yml`，push to main + `workflow_dispatch` 手动触发
