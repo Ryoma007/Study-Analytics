@@ -7,3 +7,6 @@ coverage/
 .env*
 !.env.example
 .claude/settings.local.json
+
+# SQLite 数据库宿主卷（dev 态生成 study.db，阶段4 compose 从宿主挂载）
+data/
