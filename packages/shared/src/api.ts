@@ -2,8 +2,8 @@
  * API 请求/响应 DTO 契约 —— 前后端共享的接口形状
  * 后端实现需严格匹配此契约，前端按此调用
  */
-import type { ActivitySession, ActiveSession, RangeType, StatisticsData } from './types';
-import type { ActivityType } from './enums';
+import type { ActivitySession, ActiveSession, RangeType, StatisticsData } from './types.js';
+import type { ActivityType } from './enums.js';
 
 // ===== 计时生命周期 =====
 

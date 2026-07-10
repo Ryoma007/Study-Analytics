@@ -2,7 +2,7 @@
  * 共享类型定义 —— 前后端共享的领域模型
  * 见 CONTEXT.md 术语表与 ADR-0004（schema 定义）
  */
-import type { ActivityType } from './enums';
+import type { ActivityType } from './enums.js';
 
 /**
  * 已完成的活动记录（归档）
