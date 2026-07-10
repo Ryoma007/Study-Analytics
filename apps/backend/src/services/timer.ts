@@ -11,8 +11,8 @@ import { randomUUID } from 'node:crypto';
 import type { Database } from 'better-sqlite3';
 import type { ActiveSession, ActivityType } from '@study-analytics/shared';
 import { activityTypeFromValue, SETTLE_REASON_PREEMPTED, SETTLE_REASON_TIMEOUT } from '@study-analytics/shared';
-import { isStale } from '../db';
-import type { Clock } from '../clock';
+import { isStale } from '../db.js';
+import type { Clock } from '../clock.js';
 
 /** 当前活跃会话行（DB 映射，snake_case） */
 interface ActiveRow {

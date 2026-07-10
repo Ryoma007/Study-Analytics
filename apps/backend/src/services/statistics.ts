@@ -8,7 +8,7 @@
 import type { Database } from 'better-sqlite3';
 import type { StatisticsData, ChartDataPoint, FormattedTime, RangeType } from '@study-analytics/shared';
 import { ActivityType } from '@study-analytics/shared';
-import type { SessionRow } from '../session-row';
+import type { SessionRow } from '../session-row.js';
 
 /** 统计读取时只关注 type/start_time/duration 三列 */
 type StatsRow = Pick<SessionRow, 'type' | 'start_time' | 'duration'>;

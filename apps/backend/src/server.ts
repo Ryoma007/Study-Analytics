@@ -5,8 +5,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import { createDb } from './db';
-import { createApp, createAppContext } from './routes';
+import { createDb } from './db.js';
+import { createApp, createAppContext } from './routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

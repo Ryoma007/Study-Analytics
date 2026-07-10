@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { Database } from 'better-sqlite3';
 import type { ActivitySession } from '@study-analytics/shared';
 import { ActivityType, activityTypeFromValue } from '@study-analytics/shared';
-import type { SessionRow } from '../session-row';
+import type { SessionRow } from '../session-row.js';
 
 /** 把 DB 行映射为 ActivitySession（camelCase） */
 function toSession(row: SessionRow): ActivitySession {

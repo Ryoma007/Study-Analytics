@@ -4,11 +4,11 @@
  */
 import express, { type Express } from 'express';
 import type { Database } from 'better-sqlite3';
-import type { Clock } from './clock';
-import { systemClock } from './clock';
-import { TimerService } from './services/timer';
-import { SessionsService } from './services/sessions';
-import { StatisticsService } from './services/statistics';
+import type { Clock } from './clock.js';
+import { systemClock } from './clock.js';
+import { TimerService } from './services/timer.js';
+import { SessionsService } from './services/sessions.js';
+import { StatisticsService } from './services/statistics.js';
 import {
   activityTypeFromValue,
   RANGE_VALUES,
