@@ -5,11 +5,9 @@
 # ===== 构建阶段 =====
 FROM node:22-alpine AS builder
 
-# 安装 better-sqlite3 编译依赖
-RUN apk add --no-cache python3 make g++
-
-# 启用 pnpm（package.json 的 packageManager 已声明版本）
-RUN corepack enable
+# 安装 better-sqlite3 编译依赖 + pnpm
+RUN apk add --no-cache python3 make g++ && \
+    npm install -g pnpm@9.15.4
 
 WORKDIR /app
 
@@ -20,7 +18,8 @@ COPY apps/frontend/package.json apps/frontend/
 COPY packages/shared/package.json packages/shared/
 
 # 安装全部依赖（含 devDependencies，供构建用）
-RUN pnpm install --frozen-lockfile
+# 不锁死 lockfile：跨平台（Windows→Linux）native 依赖可能略有差异
+RUN pnpm install
 
 # 复制完整源码并构建
 COPY . .
