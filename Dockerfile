@@ -18,11 +18,12 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/backend/package.json apps/backend/
 COPY apps/frontend/package.json apps/frontend/
 COPY packages/shared/package.json packages/shared/
+COPY packages/shared/tsconfig.json packages/shared/
 
 # 安装全部依赖（含 devDependencies，供构建用）
 RUN pnpm install --frozen-lockfile
 
-# 复制完整源码并构建
+# 复制完整源码并构建（shared → backend → frontend）
 COPY . .
 RUN pnpm -r build
 
@@ -42,9 +43,9 @@ COPY --from=builder /app/apps/frontend/dist ./apps/frontend/dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 
 # 复制 node_modules（含 better-sqlite3 已编译的 native 模块）
+# 注意：packages/shared 零运行时依赖，无 node_modules，无需复制
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
-COPY --from=builder /app/packages/shared/node_modules ./packages/shared/node_modules
 
 # 环境变量
 ENV SERVE_STATIC=1
