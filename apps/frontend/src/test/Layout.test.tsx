@@ -115,16 +115,20 @@ describe('Layout', () => {
     expect(onTabChange).toHaveBeenCalledWith('history');
   });
 
-  // === 统计页隐藏类型切换 ===
-  it('hideTypeSwitcher=true 时不渲染类型切换按钮', () => {
+  // === 统计页禁用类型切换（切换器始终渲染，按钮不可点击） ===
+  it('disableTypeSwitcher=true 时切换按钮渲染但 disabled', () => {
     const onTabChange = vi.fn();
     render(
-      <Layout currentTab="statistics" onTabChange={onTabChange} hideTypeSwitcher>
+      <Layout currentTab="statistics" onTabChange={onTabChange} disableTypeSwitcher>
         <div data-testid="content">page content</div>
       </Layout>
     );
-    expect(screen.queryByText('学习')).toBeNull();
-    expect(screen.queryByText('阅读')).toBeNull();
+    // 按钮仍然在 DOM 中（不隐藏，避免闪烁和下方内容上移）
+    expect(screen.getByText('学习')).toBeInTheDocument();
+    expect(screen.getByText('阅读')).toBeInTheDocument();
+    // 两个按钮都被禁用
+    expect(screen.getByText('学习').closest('button')).toBeDisabled();
+    expect(screen.getByText('阅读').closest('button')).toBeDisabled();
   });
 
   it('数据统计页仍渲染导航 tab', () => {

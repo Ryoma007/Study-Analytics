@@ -31,7 +31,7 @@ export default function App() {
       <Layout
         currentTab={currentTab}
         onTabChange={setCurrentTab}
-        hideTypeSwitcher={currentTab === 'statistics'}
+        disableTypeSwitcher={currentTab === 'statistics'}
         isTimerRunning={isTimerRunning}
       >
         {currentTab === 'timer' && <TimerPage onRunningChange={handleRunningChange} />}

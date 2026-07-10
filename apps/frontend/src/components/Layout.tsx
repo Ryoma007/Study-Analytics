@@ -8,13 +8,13 @@ interface LayoutProps {
   children: React.ReactNode;
   currentTab: string;
   onTabChange: (tab: string) => void;
-  /** 是否隐藏活动类型切换器（统计页等不需要切换器的页面使用） */
-  hideTypeSwitcher?: boolean;
+  /** 是否禁用活动类型切换器（统计页等不需要切换器的页面使用，切换器始终可见但不可点击） */
+  disableTypeSwitcher?: boolean;
   /** 计时器是否正在运行（从 TimerPage 组件本地态传入，用于类型切换守卫） */
   isTimerRunning?: boolean;
 }
 
-export function Layout({ children, currentTab, onTabChange, hideTypeSwitcher = false, isTimerRunning = false }: LayoutProps) {
+export function Layout({ children, currentTab, onTabChange, disableTypeSwitcher = false, isTimerRunning = false }: LayoutProps) {
   const currentType = useActivityStore((s) => s.currentType);
   const setCurrentType = useActivityStore((s) => s.setCurrentType);
 
@@ -38,30 +38,29 @@ export function Layout({ children, currentTab, onTabChange, hideTypeSwitcher = f
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">时间记录</h1>
         </div>
 
-        {/* 活动类型切换（分段按钮） */}
-        {!hideTypeSwitcher && (
-          <div className="px-4 py-3 border-b border-slate-100">
-            <div className="flex rounded-lg bg-slate-100 p-1">
-              {ACTIVITY_TYPES.map((type) => {
-                const isActive = currentType === type;
-                return (
-                  <button
-                    key={type}
-                    onClick={() => setCurrentType(type)}
-                    disabled={isTimerRunning}
-                    className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                      isActive
-                        ? 'bg-white text-slate-800 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
-                    } ${isTimerRunning ? 'cursor-not-allowed opacity-60' : ''}`}
-                  >
-                    {getActivityConfig(type).label}
-                  </button>
-                );
-              })}
-            </div>
+        {/* 活动类型切换（分段按钮），统计页禁用而非隐藏，避免 DOM 闪烁和下方内容上移 */}
+        <div className="px-4 py-3 border-b border-slate-100">
+          <div className="flex rounded-lg bg-slate-100 p-1">
+            {ACTIVITY_TYPES.map((type) => {
+              const isActive = currentType === type;
+              const isDisabled = isTimerRunning || disableTypeSwitcher;
+              return (
+                <button
+                  key={type}
+                  onClick={() => setCurrentType(type)}
+                  disabled={isDisabled}
+                  className={`flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                    isActive
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  } ${isDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
+                >
+                  {getActivityConfig(type).label}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {/* 导航 tab */}
         <nav className="flex-1 p-4 space-y-1">

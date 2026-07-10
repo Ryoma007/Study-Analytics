@@ -191,7 +191,7 @@ CREATE TABLE active_session (
 
 ### Layout 接口
 
-`Layout` 的 `hideTypeSwitcher?: boolean` prop，由 App.tsx 传入 `currentTab === 'statistics'`。Layout 不持有页面特定知识。
+`Layout` 的 `disableTypeSwitcher?: boolean` prop，由 App.tsx 传入 `currentTab === 'statistics'`。切换器始终渲染（避免 DOM 闪烁/内容位移），按钮添加 `disabled`。Layout 不持有页面特定知识。
 
 ### 测试约定
 
