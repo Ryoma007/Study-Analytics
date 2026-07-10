@@ -32,7 +32,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: 运行测试
-        run: pnpm vitest run
+        run: pnpm -r test
 
   # 第二步：构建并推送 Docker 镜像（测试通过后执行）
   build-and-push:

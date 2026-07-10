@@ -1,13 +1,21 @@
 version: '3.8'
 
 services:
-  study-tracker:
+  study-analytics:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: study-tracker
+    container_name: study-analytics
     ports:
-      - "47291:80"
+      # 对外暴露 47291，映射容器内 3002
+      - "47291:3002"
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      - SERVE_STATIC=1
+      - PORT=3002
+      # SQLite 数据库持久化路径
+      - DB_PATH=/app/data/study.db
+    volumes:
+      # 挂卷持久化 SQLite 数据库
+      - ./data:/app/data
