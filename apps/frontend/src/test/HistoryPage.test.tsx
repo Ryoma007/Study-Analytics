@@ -26,6 +26,7 @@ beforeEach(() => {
 describe('HistoryPage', () => {
   // === 类型过滤：mock 数据已在前端通过 useSessions(type) 过滤，
   // 后端直接返回对应类型的数据。这里测试组件展示后端返回的数据。
+  // 注意：SessionTable 桌面端表格 + 移动端卡片双轨渲染，内容文本各出现两次
 
   it('显示从后端获取的学习记录', () => {
     mockSessions.push(
@@ -33,8 +34,9 @@ describe('HistoryPage', () => {
       { id: '2', type: 'STUDY', date: '2026-07-02', startTime: 5, endTime: 6, duration: 300, content: '学习C' }
     );
     render(<HistoryPage />);
-    expect(screen.getByText('学习A')).toBeInTheDocument();
-    expect(screen.getByText('学习C')).toBeInTheDocument();
+    // 双轨渲染：桌面端表格和移动端卡片各显示一次
+    expect(screen.getAllByText('学习A')).toHaveLength(2);
+    expect(screen.getAllByText('学习C')).toHaveLength(2);
   });
 
   it('切换到 READING 后显示阅读记录', () => {
@@ -43,7 +45,8 @@ describe('HistoryPage', () => {
       { id: '3', type: 'READING', date: '2026-07-01', startTime: 3, endTime: 4, duration: 200, content: '阅读B' }
     );
     render(<HistoryPage />);
-    expect(screen.getByText('阅读B')).toBeInTheDocument();
+    // 双轨渲染：桌面端表格和移动端卡片各显示一次
+    expect(screen.getAllByText('阅读B')).toHaveLength(2);
   });
 
   // === 弹窗类型选择器 ===

@@ -21,10 +21,11 @@ export function TimerPage({ onRunningChange }: TimerPageProps) {
   }, [isRunning, onRunningChange]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] space-y-12">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] md:min-h-[80vh] space-y-8 md:space-y-12">
       <div className="text-center space-y-4">
         <h2 className="text-sm font-semibold tracking-widest text-slate-400 uppercase">{cfg.copy.heading}</h2>
-        <div className="text-8xl font-mono font-light text-slate-800 tracking-tight">
+        {/* 响应式字体：手机端 text-6xl（~60px），桌面端 text-8xl（~96px） */}
+        <div className="text-6xl md:text-8xl font-mono font-light text-slate-800 tracking-tight">
           {formatTime(displayTime)}
         </div>
       </div>
@@ -34,17 +35,17 @@ export function TimerPage({ onRunningChange }: TimerPageProps) {
           <button
             onClick={handleStart}
             data-testid="timer-start"
-            className={`w-20 h-20 flex items-center justify-center rounded-full text-white shadow-lg hover:scale-105 transition-all duration-200 ${cfg.color.tailwind.btn}`}
+            className={`w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-full text-white shadow-lg hover:scale-105 transition-all duration-200 ${cfg.color.tailwind.btn}`}
           >
-            <Play className="w-8 h-8 ml-1" />
+            <Play className="w-6 h-6 md:w-8 md:h-8 ml-0.5 md:ml-1" />
           </button>
         ) : (
           <button
             onClick={handleStop}
             data-testid="timer-stop"
-            className="w-20 h-20 flex items-center justify-center rounded-full bg-rose-500 text-white shadow-lg shadow-rose-200 hover:bg-rose-600 hover:scale-105 transition-all duration-200"
+            className="w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-full bg-rose-500 text-white shadow-lg shadow-rose-200 hover:bg-rose-600 hover:scale-105 transition-all duration-200"
           >
-            <Square className="w-8 h-8" />
+            <Square className="w-6 h-6 md:w-8 md:h-8" />
           </button>
         )}
       </div>
@@ -58,7 +59,7 @@ export function TimerPage({ onRunningChange }: TimerPageProps) {
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder={cfg.copy.placeholder}
-          className={`w-full p-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:ring-2 outline-none transition-all resize-none h-32 text-slate-700 ${cfg.color.tailwind.focusRing}`}
+          className={`w-full p-4 rounded-xl border border-slate-200 bg-white shadow-sm focus:ring-2 outline-none transition-all resize-none h-24 md:h-32 text-slate-700 ${cfg.color.tailwind.focusRing}`}
         />
       </div>
     </div>

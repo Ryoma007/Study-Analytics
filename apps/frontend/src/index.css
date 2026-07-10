@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+/* 移动端底部安全区（iPhone 刘海屏适配） */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

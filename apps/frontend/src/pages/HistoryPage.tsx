@@ -126,20 +126,23 @@ export function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      {/* 标题栏 */}
-      <div className="flex items-center justify-between">
+      {/* 标题栏（移动端上下堆叠，桌面端水平排列） */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
           {getActivityConfig(currentType).copy.historyTitle}
         </h2>
-        <div className="flex gap-3">
+        <div className="flex gap-3 self-start md:self-auto">
           {selectedIds.length > 0 && (
             <button
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors font-medium text-sm"
+              aria-label={`删除选中的 ${selectedIds.length} 项`}
+              className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors font-medium text-sm"
             >
               <Trash2 className="w-4 h-4" />
-              删除选中 ({selectedIds.length})
+              {/* 移动端只显示数字，桌面端显示完整文案 */}
+              <span className="hidden md:inline">删除选中 ({selectedIds.length})</span>
+              <span className="md:hidden">{selectedIds.length}</span>
             </button>
           )}
           <button

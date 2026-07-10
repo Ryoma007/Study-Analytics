@@ -1,4 +1,4 @@
-// Layout 组件行为测试
+// Layout 组件行为测试（含响应式双轨渲染：桌面侧边栏 + 移动端底栏/TopBar）
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Layout } from '../components/Layout';
 import { useActivityStore } from '../store';
@@ -45,29 +45,38 @@ describe('Layout', () => {
     expect(screen.getByText('时间记录')).toBeInTheDocument();
   });
 
-  // === 分段按钮 ===
-  it('渲染学习和阅读两个分段按钮', () => {
+  // === 分段按钮（桌面侧边栏 + 移动端顶栏 双轨渲染，各有两个"学习"/"阅读"按钮） ===
+  it('渲染学习和阅读两个分段按钮（桌面端+移动端各一组）', () => {
     renderLayout();
-    expect(screen.getByText('学习')).toBeInTheDocument();
-    expect(screen.getByText('阅读')).toBeInTheDocument();
+    // 双轨渲染：桌面侧边栏 + 移动端顶栏各有一组切换按钮
+    const studyButtons = screen.getAllByText('学习');
+    const readingButtons = screen.getAllByText('阅读');
+    expect(studyButtons).toHaveLength(2);
+    expect(readingButtons).toHaveLength(2);
   });
 
   it('默认选中"学习"（跟随 currentType）', () => {
     renderLayout();
-    const studyBtn = screen.getByText('学习').closest('button');
-    expect(studyBtn).not.toBeNull();
+    const studyBtns = screen.getAllByText('学习');
+    // 每个按钮都应该是 <button>
+    studyBtns.forEach((btn) => {
+      expect(btn.closest('button')).not.toBeNull();
+    });
   });
 
   it('store currentType 为 READING 时选中"阅读"', () => {
     useActivityStore.getState().setCurrentType(ActivityType.READING);
     renderLayout();
-    const readingBtn = screen.getByText('阅读').closest('button');
-    expect(readingBtn).not.toBeNull();
+    const readingBtns = screen.getAllByText('阅读');
+    readingBtns.forEach((btn) => {
+      expect(btn.closest('button')).not.toBeNull();
+    });
   });
 
   it('点击"阅读"触发类型切换', () => {
     renderLayout();
-    fireEvent.click(screen.getByText('阅读'));
+    // 点击第一个匹配的"阅读"按钮即可（桌面端侧边栏中的）
+    fireEvent.click(screen.getAllByText('阅读')[0]);
     const { currentType } = useActivityStore.getState();
     expect(currentType).toBe(ActivityType.READING);
   });
@@ -75,7 +84,7 @@ describe('Layout', () => {
   it('点击"学习"触发类型切换', () => {
     useActivityStore.getState().setCurrentType(ActivityType.READING);
     renderLayout();
-    fireEvent.click(screen.getByText('学习'));
+    fireEvent.click(screen.getAllByText('学习')[0]);
     const { currentType } = useActivityStore.getState();
     expect(currentType).toBe(ActivityType.STUDY);
   });
@@ -97,21 +106,26 @@ describe('Layout', () => {
   // === 计时中禁用（通过 isTimerRunning prop） ===
   it('isTimerRunning=true 时，分段按钮 disabled', () => {
     renderLayout('timer', true);
-    const readingBtn = screen.getByText('阅读').closest('button');
-    expect(readingBtn).toBeDisabled();
+    const readingBtns = screen.getAllByText('阅读');
+    // 所有"阅读"按钮应该都被禁用
+    readingBtns.forEach((btn) => {
+      expect(btn.closest('button')).toBeDisabled();
+    });
   });
 
-  // === 导航 tab 不变 ===
-  it('三个导航 tab 仍然存在', () => {
+  // === 导航 tab 不变（桌面侧边栏 + 移动端底栏 双轨渲染） ===
+  it('三个导航 tab 仍然存在（桌面端+移动端各一组）', () => {
     renderLayout();
-    expect(screen.getByText('计时器')).toBeInTheDocument();
-    expect(screen.getByText('历史记录')).toBeInTheDocument();
-    expect(screen.getByText('数据统计')).toBeInTheDocument();
+    // 双轨渲染：桌面侧边栏 + 移动端底栏各有一组导航按钮
+    expect(screen.getAllByText('计时器')).toHaveLength(2);
+    expect(screen.getAllByText('历史记录')).toHaveLength(2);
+    expect(screen.getAllByText('数据统计')).toHaveLength(2);
   });
 
   it('点击导航 tab 触发 onTabChange', () => {
     const { onTabChange } = renderLayout();
-    fireEvent.click(screen.getByText('历史记录'));
+    // 点击第一个匹配的"历史记录"按钮
+    fireEvent.click(screen.getAllByText('历史记录')[0]);
     expect(onTabChange).toHaveBeenCalledWith('history');
   });
 
@@ -124,18 +138,22 @@ describe('Layout', () => {
       </Layout>
     );
     // 按钮仍然在 DOM 中（不隐藏，避免闪烁和下方内容上移）
-    expect(screen.getByText('学习')).toBeInTheDocument();
-    expect(screen.getByText('阅读')).toBeInTheDocument();
-    // 两个按钮都被禁用
-    expect(screen.getByText('学习').closest('button')).toBeDisabled();
-    expect(screen.getByText('阅读').closest('button')).toBeDisabled();
+    const studyBtns = screen.getAllByText('学习');
+    const readingBtns = screen.getAllByText('阅读');
+    // 两组按钮都存在（桌面端+移动端）
+    expect(studyBtns).toHaveLength(2);
+    expect(readingBtns).toHaveLength(2);
+    // 所有按钮都被禁用
+    [...studyBtns, ...readingBtns].forEach((btn) => {
+      expect(btn.closest('button')).toBeDisabled();
+    });
   });
 
   it('数据统计页仍渲染导航 tab', () => {
     renderLayout('statistics');
-    expect(screen.getByText('计时器')).toBeInTheDocument();
-    expect(screen.getByText('历史记录')).toBeInTheDocument();
-    expect(screen.getByText('数据统计')).toBeInTheDocument();
+    expect(screen.getAllByText('计时器')).toHaveLength(2);
+    expect(screen.getAllByText('历史记录')).toHaveLength(2);
+    expect(screen.getAllByText('数据统计')).toHaveLength(2);
   });
 
   // === 子内容渲染 ===

@@ -59,16 +59,16 @@ export function StatisticsPage() {
 
   return (
     <div className="space-y-8">
-      {/* 标题和时间范围选择 */}
-      <div className="flex items-center justify-between">
+      {/* 标题和时间范围选择（移动端上下堆叠，桌面端水平排列） */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h2 className="text-2xl font-bold text-slate-800 tracking-tight">数据统计</h2>
-        <div className="flex bg-white rounded-lg p-1 shadow-sm border border-slate-200">
+        <div className="flex bg-white rounded-lg p-1 shadow-sm border border-slate-200 self-start">
           {(['7', '14', '30', 'year'] as const).map((range) => (
             <button
               key={range}
               onClick={() => setRangeType(range)}
               disabled={isLoading}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              className={`px-3 md:px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 rangeType === range
                   ? 'bg-indigo-50 text-indigo-700'
                   : 'text-slate-500 hover:text-slate-700'

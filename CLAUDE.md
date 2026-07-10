@@ -60,11 +60,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 开发服务器（端口 3001，绑定所有网卡）
 pnpm dev
 
-# 运行测试
-pnpm vitest run
-
-# 运行测试（监听模式）
-pnpm vitest
+# 运行测试（monorepo，需进入子包目录）
+# 前端
+cd apps/frontend && npx vitest run
+# 后端
+cd apps/backend && npx vitest run
+# 监听模式
+cd apps/frontend && npx vitest
 
 # 构建
 pnpm build
@@ -192,6 +194,15 @@ CREATE TABLE active_session (
 ### Layout 接口
 
 `Layout` 的 `disableTypeSwitcher?: boolean` prop，由 App.tsx 传入 `currentTab === 'statistics'`。切换器始终渲染（避免 DOM 闪烁/内容位移），按钮添加 `disabled`。Layout 不持有页面特定知识。
+
+### 响应式设计约定
+
+- 响应式断点统一 `md:`（768px），不要混用 `sm:`。
+- 桌面/移动端用 `hidden md:flex` / `md:hidden` 双轨渲染（CSS `display: none` 对屏幕阅读器友好）。
+- **双轨渲染测试陷阱**：jsdom 不解析 CSS media query，桌面端和移动端元素同时存在 DOM。测试中 `getByText` 会找到多个匹配，改用 `getAllByText` + `.toHaveLength(2)`。
+- Layout 移动端底栏是 `fixed` 定位（`h-16` + `safe-area-bottom`），`<main>` 必须 `pb-24 md:pb-0` 预留空间。
+- 移动端触控目标至少 44×44px（WCAG 2.5.5），`p-2`（8px 内边距）配合图标基本满足。
+- TypeSwitcher（学习/阅读分段按钮）在 Layout 内提取为内部组件，桌面侧边栏和移动端顶栏复用同一组件。
 
 ### 测试约定
 
